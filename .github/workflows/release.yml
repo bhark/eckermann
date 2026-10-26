@@ -4,10 +4,42 @@ on:
   push:
     tags: ["v*"]
 
+permissions:
+  contents: read
+
 jobs:
+  notes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      body: ${{ steps.cliff.outputs.body }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      # the binary itself is pinned by digest; bumped by hand, dependabot does not track it
+      - env:
+          CLIFF: git-cliff-2.14.2-x86_64-unknown-linux-gnu.tar.gz
+          SHA512: 26d1f7c8ea2400f2ccb0b2e7f321635f600b583bf4cd1f7afaa5e8c24068ad1088a2504e0a4d9f4333d4bb20a80329327d9462634343ee3af91e1a7fbdc6f18a
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/$CLIFF" "https://github.com/orhun/git-cliff/releases/download/v2.14.2/$CLIFF"
+          echo "$SHA512  $RUNNER_TEMP/$CLIFF" | sha512sum -c -
+          tar -xzf "$RUNNER_TEMP/$CLIFF" -C "$RUNNER_TEMP" --strip-components=1
+      - id: cliff
+        run: |
+          {
+            echo "body<<NOTES_EOF"
+            "$RUNNER_TEMP/git-cliff" --config cliff.toml --latest --strip header
+            echo "NOTES_EOF"
+          } >> "$GITHUB_OUTPUT"
+
   build:
+    needs: notes
     permissions:
       contents: write
+      id-token: write
+      attestations: write
     strategy:
       fail-fast: false
       matrix:
@@ -60,4 +92,28 @@ jobs:
           tauriScript: bun tauri
           tagName: ${{ github.ref_name }}
           releaseName: Eckermann ${{ github.ref_name }}
+          releaseBody: ${{ needs.notes.outputs.body }}
           releaseDraft: true
+      # each leg matches only its own installers
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            src-tauri/target/release/bundle/dmg/*.dmg
+            src-tauri/target/release/bundle/appimage/*.AppImage
+            src-tauri/target/release/bundle/deb/*.deb
+            src-tauri/target/release/bundle/rpm/*.rpm
+
+  checksums:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release download "$TAG" -R "$GITHUB_REPOSITORY" -D out -p '*.dmg' -p '*.AppImage' -p '*.deb' -p '*.rpm'
+          (cd out && sha256sum -- *) > SHA256SUMS
+          gh release upload "$TAG" -R "$GITHUB_REPOSITORY" SHA256SUMS --clobber

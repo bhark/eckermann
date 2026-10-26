@@ -1,0 +1,28 @@
+# release notes; the release title already carries the version
+[changelog]
+body = """
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | striptags | trim }}
+{% for commit in commits %}
+- {{ commit.message | upper_first }} \
+([{{ commit.id | truncate(length=7, end="") }}](https://github.com/bhark/eckermann/commit/{{ commit.id }}))
+{%- endfor %}
+{% endfor %}
+"""
+footer = """
+
+---
+[eckermann.forn.dk](https://eckermann.forn.dk) · Verify a download with `gh attestation verify <file> -R bhark/eckermann`, or against SHA256SUMS.
+"""
+
+[git]
+conventional_commits = true
+filter_unconventional = true
+# html comments only order the groups
+commit_parsers = [
+  { message = "^feat", group = "<!-- 0 -->Features" },
+  { message = "^fix", group = "<!-- 1 -->Fixes" },
+  { message = "^perf", group = "<!-- 2 -->Performance" },
+  { message = ".*", skip = true },
+]
+tag_pattern = "v[0-9].*"
