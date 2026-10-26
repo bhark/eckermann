@@ -1,0 +1,39 @@
+[package]
+name = "eckermann"
+version = "0.1.0"
+description = "Local Danish hold-to-talk dictation"
+license = "GPL-3.0-only"
+edition = "2024"
+rust-version = "1.91"
+default-run = "eckermann"
+
+[lib]
+name = "eckermann_lib"
+
+[build-dependencies]
+tauri-build = { version = "2.7.4", features = [] }
+
+[dependencies]
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+log = "0.4"
+tauri = { version = "2.12.5", features = ["tray-icon", "image-png"] }
+tauri-plugin-log = "2"
+whisper-rs = { version = "0.16", features = ["log_backend"] }
+hound = "3.5"
+cpal = "0.18"
+rubato = "5"
+arboard = { version = "3.7", default-features = false, features = ["wayland-data-control"] }
+candle-core = "0.11"
+candle-nn = "0.11"
+candle-transformers = "0.11"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+whisper-rs = { version = "0.16", features = ["vulkan"] }
+wayland-client = "0.31"
+wayland-protocols-misc = { version = "0.3", features = ["client"] }
+gtk = "0.18"
+gtk-layer-shell = { version = "0.8", features = ["v0_6"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+whisper-rs = { version = "0.16", features = ["metal"] }

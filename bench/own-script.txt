@@ -1,0 +1,34 @@
+One dictation per line: press the hotkey, read the line, press the hotkey again.
+Speak at a normal pace. "(pause)" means: stay silent for about 1 second.
+The commands are the words in capitals; say them as normal words.
+
+1. Jeg gik mig over sø og land KOMMA der mødte jeg en gammel mand PUNKTUM
+2. Jeg gik mig over sø og land (pause) KOMMA (pause) der mødte jeg en gammel mand (pause) PUNKTUM
+3. Hvad hedder du SPØRGSMÅLSTEGN
+4. Det er fantastisk UDRÅBSTEGN NY LINJE tak for i dag PUNKTUM
+5. Du skal købe følgende KOLON mælk KOMMA brød og smør PUNKTUM
+6. Han kom sent SEMIKOLON hun kom slet ikke PUNKTUM
+7. Vi bor i et hus med en gammel have PUNKTUM NYT AFSNIT om sommeren spiser vi ude PUNKTUM
+8. Kære Anne KOMMA LINJESKIFT tak for brevet PUNKTUM
+9. Første punkt NY LINIE andet punkt NY LINJE tredje punkt
+10. Mødet er i morgen LINIESKIFT husk kaffen
+11. Det var en mørk og stormfuld nat PUNKTUM vinden hylede om huset PUNKTUM
+12. Jeg har en hund (pause) SLET (pause) kat PUNKTUM
+13. Vi tog toget til Aarhus i går (pause) SLET (pause) SLET (pause) i forgårs PUNKTUM
+14. Jeg vil slette filen PUNKTUM
+15. Han sagde CITATIONSTEGN jeg kommer i morgen CITATIONSTEGN PUNKTUM
+16. Bogen START PARENTES som udkom i år SLUT PARENTES blev en succes PUNKTUM
+17. Min bror PARENTES START den ældste PARENTES SLUT bor i Odense PUNKTUM
+18. Det er en sort BINDESTREG hvid film PUNKTUM
+19. Han kom TANKESTREG men for sent PUNKTUM
+20. Det er Jens APOSTROF bil PUNKTUM
+21. Vælg ja SKRÅSTREG nej PUNKTUM
+22. Han spurgte ANFØRSELSTEGN hvor er du ANFØRSELSTEGN PUNKTUM
+23. I dag skinner solen og fuglene synger i haven
+24. Min far skriver en bog om sit liv PUNKTUM
+25. Det var en kold vinterdag (pause) og sneen faldt stille (pause) over byen PUNKTUM
+26. Jeg gik en tur KOMMA (pause) og så gik jeg hjem PUNKTUM
+27. Hej PUNKTUM NYT AFSNIT hvordan går det SPØRGSMÅLSTEGN
+28. Jeg kommer snart (pause) PUNKTUM
+29. Skal vi gå SPØRGSMÅLSTEGN (pause) ja UDRÅBSTEGN
+30. Den gamle mand gik langsomt hjem PUNKTUM (pause) SLET (pause) hjem UDRÅBSTEGN

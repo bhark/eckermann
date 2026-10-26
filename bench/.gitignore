@@ -1,0 +1,9 @@
+.venv/
+llama.cpp/
+__pycache__/
+llama-fork/
+whisper.cpp/
+openai-whisper/
+models/
+data/
+runs/

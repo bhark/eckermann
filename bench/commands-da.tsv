@@ -1,0 +1,132 @@
+text	action	target	old	new
+fed	bold	default
+Fed.	bold	default
+gør det fedt	bold	default
+gør det her fed	bold	default
+sæt det markerede med fed	bold	default
+fed skrift på sidste ord	bold	word
+gør linjen fed	bold	line
+kan du gøre hele afsnittet fedt	bold	paragraph
+fremhæv sætningen med fed	bold	sentence
+Gør det jeg lige sagde fedt.	bold	last_dictation
+kursiv	italic	default
+Kursiv.	italic	default
+sæt det i kursiv	italic	default
+skråskrift på det her ord	italic	word
+gør sætningen kursiv	italic	sentence
+lav linjen om til kursiv	italic	line
+jeg vil gerne have afsnittet i kursiv	italic	paragraph
+kursiver det sidste jeg dikterede	italic	last_dictation
+understreg	underline	default
+understreg det	underline	default
+streg ordet under	underline	word
+understreg hele linjen	underline	line
+sæt en streg under sætningen	underline	sentence
+Understreg afsnittet.	underline	paragraph
+overskrift	heading1	default
+overskrift et	heading1	default
+Overskrift 1.	heading1	default
+gør linjen til en overskrift	heading1	line
+det her skal være en hovedoverskrift	heading1	default
+lav afsnittet om til overskrift niveau et	heading1	paragraph
+formater linjen som overskrift 1	heading1	line
+overskrift to	heading2	default
+Overskrift 2.	heading2	default
+gør linjen til overskrift niveau to	heading2	line
+underoverskrift	heading2	default
+det her er en underoverskrift	heading2	default
+lav det til en mellemrubrik	heading2	default
+overskrift tre	heading3	default
+Overskrift 3.	heading3	default
+gør linjen til overskrift niveau tre	heading3	line
+formater afsnittet som overskrift 3	heading3	paragraph
+normal tekst	body_text	default
+fjern formateringen	body_text	default
+gør linjen til almindelig tekst igen	body_text	line
+det skal ikke være en overskrift	body_text	default
+brødtekst	body_text	default
+fjern fed og kursiv fra afsnittet	body_text	paragraph
+ryd al formatering i hele dokumentet	body_text	document
+punktopstilling	bullet_list	default
+lav det til en punktliste	bullet_list	default
+sæt prikker foran linjerne	bullet_list	default
+gør afsnittet til en liste med punkter	bullet_list	paragraph
+Punktopstilling.	bullet_list	default
+start en liste med bullets	bullet_list	default
+nummereret liste	numbered_list	default
+nummerer linjerne	numbered_list	default
+lav afsnittet om til en nummereret liste	numbered_list	paragraph
+sæt numre på	numbered_list	default
+Nummereret liste.	numbered_list	default
+slet	delete	default
+slet det	delete	default
+Slet det.	delete	default
+slet sidste ord	delete	word
+fjern det sidste ord	delete	word
+slet sætningen	delete	sentence
+slet den sidste sætning	delete	sentence
+slet linjen	delete	line
+fjern hele linjen	delete	line
+slet afsnittet	delete	paragraph
+slet det jeg lige sagde	delete	last_dictation
+nej det var forkert, fjern det jeg lige dikterede	delete	last_dictation
+væk med det	delete	default
+slet alt	delete	document
+Slet hele dokumentet.	delete	document
+fortryd	undo	default
+Fortryd.	undo	default
+fortryd det	undo	default
+fortryd det sidste	undo	default
+gå et skridt tilbage	undo	default
+ups, fortryd det	undo	default
+annuller det jeg lige gjorde	undo	default
+gentag	redo	default
+annuller fortryd	redo	default
+gør det igen	redo	default
+fortryd fortrydelsen	redo	default
+ny linje	new_line	default
+Ny linje.	new_line	default
+linjeskift	new_line	default
+start på en ny linje	new_line	default
+nyt afsnit	new_paragraph	default
+Nyt afsnit.	new_paragraph	default
+start et nyt afsnit	new_paragraph	default
+lav et afsnitsskift	new_paragraph	default
+marker ordet	select	word
+marker sætningen	select	sentence
+marker linjen	select	line
+marker hele afsnittet	select	paragraph
+marker alt	select	document
+vælg det sidste jeg sagde	select	last_dictation
+Marker hele dokumentet.	select	document
+gå til starten af linjen	go_start	line
+hop til begyndelsen af dokumentet	go_start	document
+gå op til toppen	go_start	document
+til starten af afsnittet	go_start	paragraph
+gå til begyndelsen af sætningen	go_start	sentence
+gå til slutningen af linjen	go_end	line
+hop til enden af dokumentet	go_end	document
+gå helt ned i bunden	go_end	document
+til slutningen af afsnittet	go_end	paragraph
+Gå til enden af linjen.	go_end	line
+ret hund til kat	replace	default	hund	kat
+erstat mandag med tirsdag	replace	default	mandag	tirsdag
+skift København ud med Aarhus	replace	default	København	Aarhus
+ret jeg var til vi var	replace	default	jeg var	vi var
+det skal være Peter og ikke Per	replace	default	Per	Peter
+Ret Mette til Merete.	replace	default	Mette	Merete
+udskift ordet bil med cykel	replace	default	bil	cykel
+erstat 2019 med 2021	replace	default	2019	2021
+i går var jeg nede i haven og plantede tulipaner	none	default
+hvad er klokken	none	default
+øh	none	default
+Tak.	none	default
+Undertekster af Nicolai Winther	none	default
+hej Mette, tak for sidst	none	default
+jeg tror vi skal ringe til lægen i morgen	none	default
+hm, vent lige lidt	none	default
+hvad var det nu jeg ville sige	none	default
+Ja.	none	default
+det var en dejlig dag ved vandet	none	default
+kan du sende en mail til min søn	none	default
+spil noget musik	none	default
