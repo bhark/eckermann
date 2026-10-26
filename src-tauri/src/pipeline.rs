@@ -206,6 +206,10 @@ impl Pipeline {
         self.live.queue_phrase(session.pcm, true);
     }
 
+    pub fn notice(&self, text: &str) {
+        self.live.notice(text);
+    }
+
     pub fn toggle(&self) {
         let recording = self.live.session.lock().unwrap().is_some();
         if recording { self.stop() } else { self.start() }
@@ -286,6 +290,11 @@ fn worker(live: &Live, rx: mpsc::Receiver<Job>, edits: mpsc::Sender<Edit>, model
                 Err(mpsc::RecvTimeoutError::Timeout) => {
                     stt = None;
                     punct = None;
+                    // glibc would keep the freed weights in its heap
+                    #[cfg(all(target_os = "linux", target_env = "gnu"))]
+                    unsafe {
+                        libc::malloc_trim(0);
+                    }
                     log::info!("speech model unloaded after {idle:?} idle");
                     continue;
                 }

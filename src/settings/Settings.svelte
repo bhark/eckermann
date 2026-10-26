@@ -1,6 +1,7 @@
 <script lang="ts">
   import { getVersion } from "@tauri-apps/api/app";
   import { invoke } from "@tauri-apps/api/core";
+  import { listen } from "@tauri-apps/api/event";
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import { flow } from "../flow";
   import { comboFromEvent, keyCaps } from "./combo";
@@ -14,9 +15,15 @@
   type HotkeyStatus =
     | { kind: "niri"; included: boolean; include_line: string }
     | { kind: "manual"; command: string };
+  type Download =
+    | { kind: "running"; done: number; total: number }
+    | { kind: "failed" }
+    | { kind: "done" };
 
   let settings = $state<Settings | null>(null);
   let status = $state<HotkeyStatus | null>(null);
+  let download = $state<Download | null>(null);
+  let autostart = $state<boolean | null>(null);
   let capturing = $state(false);
   let error = $state("");
   let version = $state("");
@@ -25,6 +32,11 @@
   invoke<Settings>("get_settings").then((s) => (settings = s));
   invoke<HotkeyStatus>("hotkey_status").then((s) => (status = s));
   getVersion().then((v) => (version = v));
+  listen<Download>("download", (e) => (download = e.payload));
+  invoke<Download>("download_status").then((d) => (download = d));
+  invoke<boolean>("autostart").then((on) => (autostart = on));
+
+  const mb = (bytes: number) => Math.round(bytes / 1e6).toLocaleString("da-DK");
 
   $effect(() => {
     const frame = flow(canvas);
@@ -51,6 +63,16 @@
       error = "";
     } catch (e) {
       error = String(e);
+    }
+  }
+
+  async function saveAutostart() {
+    try {
+      await invoke("set_autostart", { on: autostart });
+      error = "";
+    } catch (e) {
+      error = String(e);
+      autostart = !autostart;
     }
   }
 
@@ -98,6 +120,24 @@
       {#if version}<p>Version {version}</p>{/if}
     </div>
   </header>
+
+  {#if download?.kind === "running"}
+    <div class="download">
+      Henter talemodellerne
+      <span class="hint">
+        {download.total ? `${mb(download.done)} af ${mb(download.total)} MB. ` : ""}Det sker kun første gang.
+      </span>
+      <progress value={download.done} max={download.total || 1}></progress>
+    </div>
+  {:else if download?.kind === "failed"}
+    <div class="row">
+      <span>
+        Talemodellerne kunne ikke hentes
+        <span class="hint">Tjek forbindelsen til internettet, og prøv igen.</span>
+      </span>
+      <button onclick={() => invoke("download_models")}>Prøv igen</button>
+    </div>
+  {/if}
 
   {#if settings}
     <div class="row">
@@ -149,6 +189,13 @@
       <span>Mellemrum efter hver diktering</span>
       <input type="checkbox" class="switch" bind:checked={settings.trailing_space} onchange={save} />
     </label>
+
+    {#if autostart !== null}
+      <label class="row">
+        <span>Start Eckermann ved login</span>
+        <input type="checkbox" class="switch" bind:checked={autostart} onchange={saveAutostart} />
+      </label>
+    {/if}
 
     <label class="row">
       <span>
@@ -214,6 +261,26 @@
     padding: 18px 0;
     border-top: 1px solid var(--rule);
   }
+  .download {
+    padding: 18px 0;
+    border-top: 1px solid var(--rule);
+  }
+  progress {
+    display: block;
+    width: 100%;
+    height: 6px;
+    margin-top: 12px;
+    border: none;
+    border-radius: 3px;
+    overflow: hidden;
+    appearance: none;
+  }
+  progress::-webkit-progress-bar {
+    background: rgb(255 255 255 / 0.1);
+  }
+  progress::-webkit-progress-value {
+    background: var(--accent);
+  }
   .hint {
     display: block;
     margin-top: 2px;
@@ -260,6 +327,7 @@
     user-select: all;
   }
   button {
+    flex-shrink: 0;
     min-height: var(--control);
     padding: 0 12px;
     border: 1px solid rgb(255 255 255 / 0.12);

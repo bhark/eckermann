@@ -4,6 +4,7 @@ mod hotkey;
 pub mod ipc;
 #[cfg(target_os = "linux")]
 mod layer;
+mod models;
 mod overlay;
 mod paste;
 mod pipeline;
@@ -20,11 +21,22 @@ use std::sync::{Arc, Mutex};
 use tauri::image::Image;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
-use tauri::{AppHandle, Manager, RunEvent, State, WebviewUrl, WebviewWindowBuilder};
+use tauri::{AppHandle, Emitter, Manager, RunEvent, State, WebviewUrl, WebviewWindowBuilder};
+use tauri_plugin_autostart::ManagerExt;
 
 struct AppState {
     settings: Arc<Mutex<Settings>>,
     settings_path: PathBuf,
+    models: PathBuf,
+    download: Mutex<Download>,
+}
+
+#[derive(Clone, serde::Serialize)]
+#[serde(tag = "kind", rename_all = "lowercase")]
+enum Download {
+    Running { done: u64, total: u64 },
+    Failed,
+    Done,
 }
 
 /// Forwards a CLI command to the running instance, or starts the app if none runs.
@@ -45,6 +57,8 @@ pub fn main() {
 }
 
 fn run() {
+    // reqwest's rustls comes without a crypto provider; ring, as the updater uses
+    let _ = rustls::crypto::ring::default_provider().install_default();
     let app = tauri::Builder::default()
         .plugin(
             tauri_plugin_log::Builder::default()
@@ -53,11 +67,16 @@ fn run() {
                 .level_for("whisper_rs::whisper_logging_hook", log::LevelFilter::Warn)
                 .build(),
         )
+        .plugin(tauri_plugin_autostart::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             get_settings,
             set_settings,
             hotkey_status,
-            set_hotkey
+            set_hotkey,
+            download_status,
+            download_models,
+            autostart,
+            set_autostart
         ])
         .setup(|app| {
             let settings_path = app.path().app_config_dir()?.join("settings.json");
@@ -69,13 +88,26 @@ fn run() {
             let settings = Arc::new(Mutex::new(settings));
             let models = app.path().app_data_dir()?.join("models");
             let overlay = overlay::Overlay::new(app.handle())?;
-            app.manage(Pipeline::new(models, settings.clone(), move |event| {
-                overlay.handle(event)
-            }));
+            app.manage(Pipeline::new(
+                models.clone(),
+                settings.clone(),
+                move |event| overlay.handle(event),
+            ));
+            // no models yet: a first install, which starts at login from now on
+            let first_run = !models::missing(&models).is_empty();
             app.manage(AppState {
                 settings,
                 settings_path,
+                models,
+                download: Mutex::new(Download::Done),
             });
+            if first_run {
+                if let Err(e) = app.autolaunch().enable() {
+                    log::error!("autostart: {e}");
+                }
+                fetch_models(app.handle());
+                show_settings(app.handle());
+            }
             let handle = app.handle().clone();
             ipc::listen(move |cmd| on_command(&handle, cmd))?;
             tray(app.handle())?;
@@ -95,20 +127,70 @@ fn run() {
 }
 
 fn on_command(app: &AppHandle, cmd: Command) {
-    match cmd {
-        Command::Show => {
+    let pipeline = app.state::<Pipeline>();
+    let download = app.state::<AppState>().download.lock().unwrap().clone();
+    match (cmd, download) {
+        (Command::Show, _) => {
             let handle = app.clone();
             let _ = app.run_on_main_thread(move || show_settings(&handle));
         }
-        Command::PttStart => app.state::<Pipeline>().start(),
-        Command::PttStop => app.state::<Pipeline>().stop(),
-        Command::PttToggle => app.state::<Pipeline>().toggle(),
+        (Command::PttStop, _) => pipeline.stop(),
+        (_, Download::Running { .. }) => pipeline.notice("Talemodellerne hentes stadig."),
+        (_, Download::Failed) => {
+            pipeline.notice("Talemodellerne mangler. Hent dem igen i Indstillinger.")
+        }
+        (Command::PttStart, Download::Done) => pipeline.start(),
+        (Command::PttToggle, Download::Done) => pipeline.toggle(),
     }
+}
+
+/// Downloads the missing model files, unless a download runs already.
+fn fetch_models(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    let files = models::missing(&state.models);
+    {
+        let mut download = state.download.lock().unwrap();
+        if matches!(*download, Download::Running { .. }) {
+            return;
+        }
+        *download = match files.is_empty() {
+            true => Download::Done,
+            false => Download::Running { done: 0, total: 0 },
+        };
+    }
+    if files.is_empty() {
+        return;
+    }
+    let app = app.clone();
+    let dir = state.models.clone();
+    tauri::async_runtime::spawn(async move {
+        let report = |download: Download| {
+            let _ = app.emit("download", &download);
+            *app.state::<AppState>().download.lock().unwrap() = download;
+        };
+        let mut shown = None;
+        let result = models::fetch(&dir, &files, |done, total| {
+            // a thousand steps are plenty for the bar
+            let step = done * 1000 / total;
+            if shown != Some(step) {
+                shown = Some(step);
+                report(Download::Running { done, total });
+            }
+        })
+        .await;
+        report(match result {
+            Ok(()) => Download::Done,
+            Err(e) => {
+                log::error!("model download: {e}");
+                Download::Failed
+            }
+        });
+    });
 }
 
 // the panel plus the transparent margin around it, as in Settings.svelte
 const SETTINGS_WIDTH: i32 = 496;
-const SETTINGS_HEIGHT: i32 = 560;
+const SETTINGS_HEIGHT: i32 = 720;
 const SETTINGS_MARGIN: i32 = 28;
 
 fn show_settings(app: &AppHandle) {
@@ -170,6 +252,31 @@ fn set_settings(state: State<AppState>, settings: Settings) -> Result<(), String
     settings::save(&state.settings_path, &settings).map_err(|e| e.to_string())?;
     *current = settings;
     Ok(())
+}
+
+#[tauri::command]
+fn download_status(state: State<AppState>) -> Download {
+    state.download.lock().unwrap().clone()
+}
+
+#[tauri::command]
+fn download_models(app: AppHandle) {
+    fetch_models(&app);
+}
+
+#[tauri::command]
+fn autostart(app: AppHandle) -> Result<bool, String> {
+    app.autolaunch().is_enabled().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn set_autostart(app: AppHandle, on: bool) -> Result<(), String> {
+    let launch = app.autolaunch();
+    match on {
+        true => launch.enable(),
+        false => launch.disable(),
+    }
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
