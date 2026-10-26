@@ -180,6 +180,13 @@ fn run() {
         })
         .build(tauri::generate_context!())
         .expect("failed to build app");
+    // before run: tao applies its default policy, regular, at launch, which overrides LSUIElement
+    #[cfg(target_os = "macos")]
+    let app = {
+        let mut app = app;
+        app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+        app
+    };
     app.run(|_app, event| match event {
         // background app: closing the last window must not quit
         RunEvent::ExitRequested {
