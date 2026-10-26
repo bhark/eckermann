@@ -10,6 +10,8 @@
     | { kind: "notice"; value: string };
 
   const MAX_WIDTH = 520;
+  // overlay.rs puts the window under the menu bar on macOS
+  const top = navigator.userAgent.includes("Mac");
 
   let shown = $state(false);
   let recording = $state(false);
@@ -75,7 +77,7 @@
   });
 </script>
 
-<div class="stage" class:shown bind:this={stage}>
+<div class="stage" class:shown class:top bind:this={stage}>
   <div
     class="glass pill"
     class:open={!!text}
@@ -120,6 +122,16 @@
       translate 620ms cubic-bezier(0.16, 1, 0.3, 1),
       scale 560ms 420ms cubic-bezier(0.34, 1.56, 0.64, 1),
       opacity 160ms;
+  }
+  /* mirrored: orb on top, dropping in from above */
+  .stage.top {
+    flex-direction: column-reverse;
+    padding: 16px 0 0;
+    transform-origin: 50% 54px;
+    translate: 0 -170px;
+  }
+  .stage.top.shown {
+    translate: 0 0;
   }
   .pill {
     height: 34px;

@@ -1,4 +1,4 @@
-//! Status window at the bottom of the screen. It never takes focus or pointer input,
+//! Status window at the bottom of the screen, the top on macOS. It never takes focus or pointer input,
 //! so the paste still lands where the user was typing.
 
 use crate::pipeline::Event;
@@ -59,16 +59,21 @@ impl Overlay {
         #[cfg(not(target_os = "linux"))]
         let usable = true;
         if usable && !layered {
-            // on the bottom edge of the work area, so above a dock; gtk got its input region in layer::overlay
+            // on the bottom edge of the work area, so above a dock, or under the menu bar on macOS;
+            // gtk got its input region in layer::overlay
             #[cfg(not(target_os = "linux"))]
             window.set_ignore_cursor_events(true)?;
             if let Some(monitor) = window.primary_monitor()? {
                 let area = monitor.work_area();
                 let size = tauri::LogicalSize::new(WIDTH, HEIGHT)
                     .to_physical::<i32>(monitor.scale_factor());
+                #[cfg(target_os = "macos")]
+                let y = area.position.y;
+                #[cfg(not(target_os = "macos"))]
+                let y = area.position.y + area.size.height as i32 - size.height;
                 window.set_position(tauri::PhysicalPosition::new(
                     area.position.x + (area.size.width as i32 - size.width) / 2,
-                    area.position.y + area.size.height as i32 - size.height,
+                    y,
                 ))?;
             }
         }
