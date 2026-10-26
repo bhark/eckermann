@@ -131,6 +131,17 @@ fn open(mic: Option<&str>, levels: Levels) -> Result<Active, String> {
         .ok_or("no microphone found")?;
     let supported = device.default_input_config().map_err(|e| e.to_string())?;
     let config = supported.config();
+    // pulse's default record fragment holds back the first audio for about 2 s, then sends 170 ms blocks
+    #[cfg(target_os = "linux")]
+    let config = match supported.buffer_size() {
+        cpal::SupportedBufferSize::Range { min, max } => StreamConfig {
+            buffer_size: cpal::BufferSize::Fixed(
+                (config.sample_rate / LEVELS_PER_SEC).clamp(*min, *max),
+            ),
+            ..config
+        },
+        cpal::SupportedBufferSize::Unknown => config,
+    };
     let buf = Buffer::default();
     let stream = match supported.sample_format() {
         SampleFormat::F32 => build::<f32>(&device, &config, buf.clone(), levels),
