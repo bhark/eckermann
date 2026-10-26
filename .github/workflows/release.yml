@@ -15,12 +15,18 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v5
-      - uses: oven-sh/setup-bun@v2
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          workspaces: src-tauri
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          # bumped by hand; dependabot does not track it
+          bun-version: 1.4.4
+          # releases build cold, so a poisoned ci cache cannot reach them
+          no-cache: true
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
+        with:
+          toolchain: stable
       # a stalled ubuntu mirror otherwise hangs the job; this step normally takes under a minute
       - if: runner.os == 'Linux'
         timeout-minutes: 5
@@ -45,7 +51,7 @@ jobs:
           rm "$RUNNER_TEMP/cert.p12"
           echo "APPLE_SIGNING_IDENTITY=Eckermann Code Signing" >> "$GITHUB_ENV"
       - run: bun install --frozen-lockfile
-      - uses: tauri-apps/tauri-action@v0
+      - uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # action-v1.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
