@@ -38,7 +38,8 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
   build:
-    needs: [ci, notes]
+    # ci runs alongside, not before; the draft is reviewed before it is published
+    needs: notes
     permissions:
       contents: write
       id-token: write
