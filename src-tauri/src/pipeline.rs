@@ -170,11 +170,12 @@ impl Pipeline {
     }
 
     pub fn start(&self) {
+        let mic = self.live.settings.lock().unwrap().mic.clone();
         let mut session = self.live.session.lock().unwrap();
         if session.is_some() {
             return;
         }
-        match self.live.recorder.start() {
+        match self.live.recorder.start(mic) {
             Ok(()) => {
                 *session = Some(Session {
                     started: Instant::now(),

@@ -15,7 +15,7 @@ fn main() -> Result<(), String> {
     let rec = Recorder::new(|level| {
         PEAK.fetch_max(level.to_bits(), Ordering::Relaxed);
     });
-    rec.start()?;
+    rec.start(None)?;
     std::thread::sleep(Duration::from_secs_f32(secs));
     let pcm = rec.stop();
     let peak = f32::from_bits(PEAK.load(Ordering::Relaxed));

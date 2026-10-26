@@ -11,7 +11,9 @@
     unload_after_min: number;
     pause_ms: number;
     hotkey: string | null;
+    mic: string | null;
   };
+  type Mic = { id: string; name: string };
   type HotkeyStatus =
     | { kind: "niri"; included: boolean; include_line: string }
     | { kind: "manual"; command: string; snippet: string | null }
@@ -28,6 +30,7 @@
   let download = $state<Download | null>(null);
   let autostart = $state<boolean | null>(null);
   let permissions = $state<Permissions | null>(null);
+  let mics = $state<Mic[]>([]);
   let capturing = $state(false);
   let error = $state("");
   let version = $state("");
@@ -39,6 +42,8 @@
   listen<Download>("download", (e) => (download = e.payload));
   invoke<Download>("download_status").then((d) => (download = d));
   invoke<boolean>("autostart").then((on) => (autostart = on));
+  const refreshMics = () => invoke<Mic[]>("microphones").then((m) => (mics = m));
+  refreshMics();
 
   const mb = (bytes: number) => Math.round(bytes / 1e6).toLocaleString("da-DK");
 
@@ -133,7 +138,7 @@
   }
 </script>
 
-<svelte:window {onkeydown} />
+<svelte:window {onkeydown} onfocus={refreshMics} />
 
 <main class="glass">
   <button class="close" onclick={close} aria-label="Luk">
@@ -144,6 +149,7 @@
     <canvas class="ball" bind:this={canvas}></canvas>
     <div>
       <h1>Eckermann</h1>
+      <p class="dedication">Til Rune</p>
       {#if version}<p>Version {version}</p>{/if}
     </div>
   </header>
@@ -225,6 +231,19 @@
     {/if}
 
     <label class="row">
+      <span>Mikrofon</span>
+      <select bind:value={settings.mic} onchange={save}>
+        <option value={null}>Systemets standard</option>
+        {#each mics as mic (mic.id)}
+          <option value={mic.id}>{mic.name}</option>
+        {/each}
+        {#if settings.mic && !mics.some((m) => m.id === settings?.mic)}
+          <option value={settings.mic}>Ikke tilsluttet</option>
+        {/if}
+      </select>
+    </label>
+
+    <label class="row">
       <span>
         Skriv efter en pause på
         <span class="hint">0: først når du stopper</span>
@@ -302,6 +321,11 @@
     margin: 4px 0 0;
     color: var(--muted);
     font-size: 13px;
+  }
+  header .dedication {
+    color: var(--text);
+    font-size: 15px;
+    font-style: italic;
   }
   .row {
     display: flex;
@@ -423,6 +447,20 @@
     text-align: right;
     appearance: textfield;
   }
+  select {
+    box-sizing: border-box;
+    min-width: 0;
+    max-width: 16em;
+    height: var(--control);
+    padding: 0 8px;
+    border: 1px solid rgb(255 255 255 / 0.1);
+    border-radius: 8px;
+    background: rgb(255 255 255 / 0.05);
+    color: var(--text);
+    color-scheme: dark;
+    font: inherit;
+    font-size: 15px;
+  }
   input[type="number"]::-webkit-inner-spin-button,
   input[type="number"]::-webkit-outer-spin-button {
     appearance: none;
@@ -457,7 +495,7 @@
   .switch:checked::before {
     translate: 18px 0;
   }
-  :is(button, input):focus-visible {
+  :is(button, input, select):focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
   }

@@ -12,8 +12,31 @@ const LEVELS_PER_SEC: u32 = 30;
 type Levels = mpsc::SyncSender<f32>;
 type Buffer = Arc<Mutex<Vec<f32>>>;
 
+#[derive(serde::Serialize)]
+pub struct Mic {
+    id: String,
+    name: String,
+}
+
+/// Microphones to choose from.
+pub fn microphones() -> Vec<Mic> {
+    let Ok(devices) = cpal::default_host().input_devices() else {
+        return Vec::new();
+    };
+    devices
+        .filter_map(|d| {
+            Some(Mic {
+                id: d.id().ok()?.to_string(),
+                name: d.description().ok()?.name().to_owned(),
+            })
+        })
+        // pulseaudio lists what each output plays as an input too
+        .filter(|m| !m.id.ends_with(".monitor"))
+        .collect()
+}
+
 enum Msg {
-    Start(mpsc::Sender<Result<(), String>>),
+    Start(Option<String>, mpsc::Sender<Result<(), String>>),
     Drain(mpsc::Sender<Vec<f32>>),
     Stop(mpsc::Sender<Vec<f32>>),
 }
@@ -50,8 +73,8 @@ impl Recorder {
             let mut active: Option<Active> = None;
             for msg in rx {
                 match msg {
-                    Msg::Start(reply) => {
-                        let opened = open(levels.clone());
+                    Msg::Start(mic, reply) => {
+                        let opened = open(mic.as_deref(), levels.clone());
                         let _ = reply.send(opened.map(|a| active = Some(a)));
                     }
                     Msg::Drain(reply) => {
@@ -71,11 +94,11 @@ impl Recorder {
         Self { tx }
     }
 
-    /// Opens the system default microphone.
-    pub fn start(&self) -> Result<(), String> {
+    /// Opens `mic`, a cpal device id, or the default microphone when it is none or gone.
+    pub fn start(&self, mic: Option<String>) -> Result<(), String> {
         let (reply, rx) = mpsc::channel();
         self.tx
-            .send(Msg::Start(reply))
+            .send(Msg::Start(mic, reply))
             .expect("recorder thread alive");
         rx.recv().expect("recorder thread alive")
     }
@@ -97,10 +120,14 @@ impl Recorder {
     }
 }
 
-// ponytail: the system sound settings pick the input; add a device setting when that falls short
-fn open(levels: Levels) -> Result<Active, String> {
-    let device = cpal::default_host()
-        .default_input_device()
+fn open(mic: Option<&str>, levels: Levels) -> Result<Active, String> {
+    let host = cpal::default_host();
+    let chosen = mic.and_then(|id| host.device_by_id(&id.parse().ok()?));
+    if mic.is_some() && chosen.is_none() {
+        log::warn!("microphone {mic:?} is gone; using the default");
+    }
+    let device = chosen
+        .or_else(|| host.default_input_device())
         .ok_or("no microphone found")?;
     let supported = device.default_input_config().map_err(|e| e.to_string())?;
     let config = supported.config();

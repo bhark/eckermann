@@ -88,7 +88,8 @@ fn run() {
             autostart,
             set_autostart,
             permissions,
-            grant
+            grant,
+            microphones
         ])
         .setup(|app| {
             let settings_path = app.path().app_config_dir()?.join("settings.json");
@@ -244,7 +245,7 @@ async fn install_update(app: &AppHandle) -> tauri_plugin_updater::Result<bool> {
 
 // the panel plus the transparent margin around it, as in Settings.svelte
 const SETTINGS_WIDTH: i32 = 496;
-const SETTINGS_HEIGHT: i32 = 720;
+const SETTINGS_HEIGHT: i32 = 760;
 #[cfg(target_os = "linux")]
 const SETTINGS_MARGIN: i32 = 28;
 
@@ -314,6 +315,12 @@ fn set_settings(state: State<AppState>, settings: Settings) -> Result<(), String
     settings::save(&state.settings_path, &settings).map_err(|e| e.to_string())?;
     *current = settings;
     Ok(())
+}
+
+// async, so the device scan runs off the main thread
+#[tauri::command]
+async fn microphones() -> Vec<audio::Mic> {
+    audio::microphones()
 }
 
 #[tauri::command]

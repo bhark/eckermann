@@ -21,7 +21,7 @@ tauri = { version = "2.12.5", features = ["tray-icon", "image-png", "macos-priva
 tauri-plugin-log = "2"
 whisper-rs = { version = "0.16", features = ["log_backend"] }
 hound = "3.5"
-cpal = "0.18"
+cpal = { version = "0.18", features = ["pulseaudio"] }
 rubato = "5"
 arboard = { version = "3.7", default-features = false, features = ["wayland-data-control"] }
 candle-core = "0.11"

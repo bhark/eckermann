@@ -12,6 +12,8 @@ pub struct Settings {
     pub pause_ms: u32,
     /// Dictation key in niri syntax, e.g. "Ctrl+Alt+Space".
     pub hotkey: Option<String>,
+    /// Microphone as a cpal device id; none follows the system default.
+    pub mic: Option<String>,
 }
 
 impl Default for Settings {
@@ -21,6 +23,7 @@ impl Default for Settings {
             unload_after_min: 10,
             pause_ms: 800,
             hotkey: None,
+            mic: None,
         }
     }
 }
@@ -57,6 +60,7 @@ mod tests {
             unload_after_min: 3,
             pause_ms: 500,
             hotkey: Some("Ctrl+Alt+Space".into()),
+            mic: Some("pulseaudio:alsa_input.usb-mic".into()),
         };
         save(&path, &s).unwrap();
         assert_eq!(load(&path), s);
