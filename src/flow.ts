@@ -152,6 +152,8 @@ export function flow(canvas: HTMLCanvasElement) {
       Z = ct * z1 - st * y;
     };
     const glow = 0.75 + (0.25 * (speed - IDLE)) / (LOUD - IDLE);
+    // full trails drop their oldest point every step; slide the tail toward the next one so it never jumps
+    const slide = sinceStep / STEP;
     ctx.clearRect(0, 0, px, px);
     // faint body, darker away from the light, fading out at the rim
     const shade = ctx.createRadialGradient(c - 0.35 * R, c - 0.4 * R, 0, c, c, R);
@@ -175,7 +177,13 @@ export function flow(canvas: HTMLCanvasElement) {
         ctx.strokeStyle = colors[p.tone];
         ctx.beginPath();
         const tr = p.trail;
-        for (let i = 0; i < tr.length; i += 3) {
+        let i = 0;
+        if (tr.length === TRAIL * 3) {
+          view(lerp(slide, tr[0], tr[3]), lerp(slide, tr[1], tr[4]), lerp(slide, tr[2], tr[5]));
+          ctx.lineTo(c + X * R, c + Y * R);
+          i = 3;
+        }
+        for (; i < tr.length; i += 3) {
           view(tr[i], tr[i + 1], tr[i + 2]);
           ctx.lineTo(c + X * R, c + Y * R);
         }
