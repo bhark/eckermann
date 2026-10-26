@@ -208,6 +208,24 @@ impl Vad {
 
     /// Sample ranges of 16 kHz `pcm` that hold speech.
     pub fn speech(&mut self, pcm: &[f32]) -> Result<Vec<Range<usize>>, String> {
+        let found = self.scan(pcm)?;
+        let mut out = Vec::new();
+        for (i, range) in found.iter().enumerate() {
+            out.push(range.clone());
+            // silero's state after long speech can hide the next, seen at 0.44 against 0.9 fresh
+            let next = found.get(i + 1).map_or(pcm.len(), |r| r.start);
+            if next.saturating_sub(range.end) >= RATE as usize {
+                let gap = self.speech(&pcm[range.end..next])?;
+                out.extend(
+                    gap.into_iter()
+                        .map(|r| range.end + r.start..range.end + r.end),
+                );
+            }
+        }
+        Ok(out)
+    }
+
+    fn scan(&mut self, pcm: &[f32]) -> Result<Vec<Range<usize>>, String> {
         let segments = self
             .0
             .segments_from_samples(WhisperVadParams::default(), pcm)
