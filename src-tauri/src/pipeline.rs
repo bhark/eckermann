@@ -206,6 +206,11 @@ impl Pipeline {
         self.live.queue_phrase(session.pcm, true);
     }
 
+    /// Recording, or phrases still to write.
+    pub fn busy(&self) -> bool {
+        self.live.session.lock().unwrap().is_some() || self.live.pending.load(SeqCst) > 0
+    }
+
     pub fn notice(&self, text: &str) {
         self.live.notice(text);
     }

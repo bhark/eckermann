@@ -18,11 +18,17 @@ use pipeline::Pipeline;
 use settings::Settings;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 use tauri::image::Image;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
+use tauri::utils::config::BundleType;
 use tauri::{AppHandle, Emitter, Manager, RunEvent, State, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_autostart::ManagerExt;
+use tauri_plugin_updater::UpdaterExt;
+
+// the app runs for weeks, so it looks again now and then
+const UPDATE_EVERY: Duration = Duration::from_secs(12 * 3600);
 
 struct AppState {
     settings: Arc<Mutex<Settings>>,
@@ -68,6 +74,7 @@ fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_autostart::Builder::new().build())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             get_settings,
             set_settings,
@@ -111,6 +118,7 @@ fn run() {
             let handle = app.handle().clone();
             ipc::listen(move |cmd| on_command(&handle, cmd))?;
             tray(app.handle())?;
+            keep_updated(app.handle().clone());
             Ok(())
         })
         .build(tauri::generate_context!())
@@ -186,6 +194,42 @@ fn fetch_models(app: &AppHandle) {
             }
         });
     });
+}
+
+/// Installs new releases, then restarts once nobody is dictating.
+fn keep_updated(app: AppHandle) {
+    // the bundler also patches target/release, and the updater would replace that binary with the AppImage
+    let installed = match tauri::utils::platform::bundle_type() {
+        Some(BundleType::AppImage) => app.env().appimage.is_some(),
+        bundle => bundle.is_some(),
+    };
+    if !installed {
+        return;
+    }
+    std::thread::spawn(move || {
+        loop {
+            match tauri::async_runtime::block_on(install_update(&app)) {
+                Ok(true) => {
+                    while app.state::<Pipeline>().busy() {
+                        std::thread::sleep(Duration::from_secs(5));
+                    }
+                    app.restart();
+                }
+                Ok(false) => {}
+                Err(e) => log::warn!("update: {e}"),
+            }
+            std::thread::sleep(UPDATE_EVERY);
+        }
+    });
+}
+
+async fn install_update(app: &AppHandle) -> tauri_plugin_updater::Result<bool> {
+    let Some(update) = app.updater()?.check().await? else {
+        return Ok(false);
+    };
+    log::info!("installing version {}", update.version);
+    update.download_and_install(|_, _| {}, || {}).await?;
+    Ok(true)
 }
 
 // the panel plus the transparent margin around it, as in Settings.svelte
