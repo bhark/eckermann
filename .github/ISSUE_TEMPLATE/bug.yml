@@ -1,0 +1,48 @@
+name: Bug report
+description: Something does not work as it should.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, and what Eckermann did.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Eckermann version
+      description: Shown at the top of the settings window.
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system and version
+      placeholder: "Arch Linux, macOS 15.4"
+    validations:
+      required: true
+  - type: input
+    id: desktop
+    attributes:
+      label: Desktop or compositor (Linux)
+      placeholder: "niri, GNOME on Wayland, KDE on X11"
+  - type: input
+    id: gpu
+    attributes:
+      label: GPU
+      placeholder: "Radeon 780M, Apple M2"
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Any output that seems related.
+      render: text

@@ -1,0 +1,21 @@
+name: Language request
+description: Ask for Eckermann to support your language.
+labels: [enhancement]
+body:
+  - type: input
+    id: language
+    attributes:
+      label: Language
+    validations:
+      required: true
+  - type: textarea
+    id: models
+    attributes:
+      label: Known models
+      description: Whisper fine-tunes or punctuation models for this language that you know of, with links.
+  - type: checkboxes
+    id: help
+    attributes:
+      label: Helping out
+      options:
+        - label: I can help test dictation in this language.
