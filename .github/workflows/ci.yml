@@ -6,6 +6,8 @@ on:
   pull_request:
   # also takes installer screenshots for review
   workflow_dispatch:
+  # release.yml runs every platform through this before it builds
+  workflow_call:
 
 permissions:
   contents: read
@@ -15,7 +17,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-15, windows-2025]
+        # pushes to main get the quick linux check; prs, manual runs and releases get every platform
+        os: ${{ fromJSON(github.event_name == 'push' && github.ref == 'refs/heads/main' && '["ubuntu-24.04"]' || '["ubuntu-24.04", "macos-15", "windows-2025"]') }}
     runs-on: ${{ matrix.os }}
     # whisper's vulkan shaders make the windows build the slow one
     timeout-minutes: 45
