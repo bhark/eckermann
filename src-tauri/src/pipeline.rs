@@ -23,7 +23,6 @@ const POLL: Duration = Duration::from_millis(200);
 const MAX_SILENCE: usize = 10 * RATE as usize;
 // audio before the last speech that vad scans again, so silero's state settles first
 const SETTLE: usize = RATE as usize / 2;
-const PREVIEW_EVERY: Duration = Duration::from_millis(700);
 // whisper's window; a preview of a longer phrase shows only its end
 const PREVIEW_MAX: usize = 28 * RATE as usize;
 
@@ -217,7 +216,6 @@ impl Pipeline {
 
 fn segmenter(live: &Live, wake: mpsc::Receiver<()>, vad_path: &Path) {
     let mut vad = None;
-    let mut last_preview = Instant::now();
     for () in wake {
         if vad.is_none() {
             vad = Vad::load(vad_path).inspect_err(|e| log::error!("{e}")).ok();
@@ -254,13 +252,11 @@ fn segmenter(live: &Live, wake: mpsc::Receiver<()>, vad_path: &Path) {
                 && speech_end != session.heard.previewed
                 && live.pending.load(SeqCst) == 0
                 && !live.previewing.load(SeqCst)
-                && last_preview.elapsed() >= PREVIEW_EVERY
             {
                 // at most one preview at a time, none while a phrase waits, none of speech shown already
                 live.previewing.store(true, SeqCst);
                 live.stale_preview.store(false, SeqCst);
                 session.heard.previewed = speech_end;
-                last_preview = Instant::now();
                 let pcm = session.pcm[len.saturating_sub(PREVIEW_MAX)..].to_vec();
                 let _ = live.jobs.send(Job::Preview(pcm));
             }

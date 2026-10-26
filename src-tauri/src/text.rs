@@ -260,7 +260,7 @@ impl Joiner {
         match deletes {
             0 => {
                 let edit = self.clone().next(phrase, false, false, punct);
-                edit.text.trim_start().to_string()
+                edit.text.trim_start_matches(' ').to_string()
             }
             n => "⌫".repeat(n),
         }
@@ -655,6 +655,7 @@ mod tests {
         let mut j = joiner();
         assert_eq!(j.preview("Hej komma du ny linje", &m), "Hej, du\n");
         assert_eq!(j.preview("slet", &m), "⌫");
+        assert_eq!(j.preview("Linjeskift.", &m), "\n");
         // after earlier phrases: their held mark, and no capital inside the sentence
         j.next("Da han kom", false, true, &m);
         assert_eq!(j.preview("Så smilede hun", &m), ", så smilede hun");
