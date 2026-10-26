@@ -1247,6 +1247,7 @@ dependencies = [
  "wayland-client",
  "wayland-protocols-misc",
  "whisper-rs",
+ "x11rb",
 ]
 
 [[package]]

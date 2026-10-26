@@ -1,42 +1,19 @@
-//! Global dictation key. Wayland apps cannot grab keys, so on niri Eckermann writes
-//! its own bind file for config.kdl to include; elsewhere the user binds the command.
+//! Wayland apps cannot grab keys, so on niri Eckermann writes its own bind file for config.kdl to include.
 
-use serde::Serialize;
+use super::{Status, sender};
 use std::path::PathBuf;
 use std::process::Command;
 
 const NIRI_FILE: &str = "eckermann.kdl";
 
-#[derive(Serialize)]
-#[serde(tag = "kind", rename_all = "lowercase")]
-pub enum Status {
-    Niri {
-        included: bool,
-        include_line: String,
-    },
-    Manual {
-        command: String,
-    },
-}
-
-pub fn status() -> Status {
-    match niri_config() {
-        Some(config) => Status::Niri {
-            included: std::fs::read_to_string(&config)
-                .is_ok_and(|text| text.contains(&format!("\"{NIRI_FILE}\""))),
-            include_line: format!("include optional=true \"{NIRI_FILE}\""),
-        },
-        None => Status::Manual {
-            command: format!("{} --ptt toggle", sender().display()),
-        },
-    }
-}
-
-/// Binds the saved key again with this executable's path; niri runs the sender, not `_on_press`.
-pub fn start(combo: Option<&str>, _on_press: impl Fn() + Send + 'static) {
-    if let Some(Err(e)) = combo.map(apply) {
-        log::error!("hotkey: {e}");
-    }
+/// None off niri.
+pub fn status() -> Option<Status> {
+    let config = niri_config()?;
+    Some(Status::Niri {
+        included: std::fs::read_to_string(&config)
+            .is_ok_and(|text| text.contains(&format!("\"{NIRI_FILE}\""))),
+        include_line: format!("include optional=true \"{NIRI_FILE}\""),
+    })
 }
 
 /// Binds `combo` (niri key syntax, e.g. "Ctrl+Alt+Space") to start and stop dictation.
@@ -92,16 +69,4 @@ fn niri_config() -> Option<PathBuf> {
         .map(PathBuf::from)
         .or_else(|| std::env::home_dir().map(|home| home.join(".config")))?;
     Some(config_home.join("niri/config.kdl"))
-}
-
-/// The small sender beside us, else the app itself.
-fn sender() -> PathBuf {
-    // inside an AppImage current_exe is a temporary mount path
-    if let Some(appimage) = std::env::var_os("APPIMAGE") {
-        return appimage.into();
-    }
-    let exe = std::env::current_exe().unwrap_or_else(|_| "eckermann".into());
-    // cargo run builds only the app
-    let sender = exe.with_file_name("eckermann-ptt");
-    if sender.exists() { sender } else { exe }
 }

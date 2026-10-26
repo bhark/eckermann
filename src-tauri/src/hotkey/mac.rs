@@ -5,21 +5,10 @@ use objc2_core_graphics::{
     CGEvent, CGEventField, CGEventFlags, CGEventTapLocation, CGEventTapOptions,
     CGEventTapPlacement, CGEventTapProxy, CGEventType, CGPreflightPostEventAccess,
 };
-use serde::Serialize;
 use std::ffi::c_void;
 use std::ptr::NonNull;
 use std::sync::Mutex;
 use std::time::Duration;
-
-#[derive(Serialize)]
-#[serde(tag = "kind", rename_all = "lowercase")]
-pub enum Status {
-    Native,
-}
-
-pub fn status() -> Status {
-    Status::Native
-}
 
 const DEFAULT: &str = "Fn";
 // kVK_Function

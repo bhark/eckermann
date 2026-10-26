@@ -1,14 +1,50 @@
 //! Puts text into the focused app: clipboard first, then a synthetic paste shortcut.
 //! Line breaks are typed as Enter keys.
 
-#[cfg(target_os = "linux")]
-mod linux;
-#[cfg(target_os = "linux")]
-use linux::Keys;
 #[cfg(target_os = "macos")]
 mod macos;
+#[cfg(target_os = "linux")]
+mod wayland;
 #[cfg(target_os = "macos")]
 use macos::Keys;
+
+/// The Wayland virtual keyboard, or XTest in an X11 session.
+#[cfg(target_os = "linux")]
+enum Keys {
+    Wayland(wayland::Keys),
+    X11(Box<crate::x11::Keys>),
+}
+
+#[cfg(target_os = "linux")]
+impl Keys {
+    fn new() -> Result<Self, String> {
+        match crate::x11::session() {
+            true => crate::x11::Keys::new().map(|keys| Self::X11(Box::new(keys))),
+            false => wayland::Keys::new().map(Self::Wayland),
+        }
+    }
+
+    fn paste(&mut self) -> Result<(), String> {
+        match self {
+            Self::Wayland(keys) => keys.paste(),
+            Self::X11(keys) => keys.paste(),
+        }
+    }
+
+    fn enter(&mut self) -> Result<(), String> {
+        match self {
+            Self::Wayland(keys) => keys.enter(),
+            Self::X11(keys) => keys.enter(),
+        }
+    }
+
+    fn backspace(&mut self) -> Result<(), String> {
+        match self {
+            Self::Wayland(keys) => keys.backspace(),
+            Self::X11(keys) => keys.backspace(),
+        }
+    }
+}
 
 // ponytail: no key sender elsewhere, so text stays on the clipboard
 #[cfg(not(any(target_os = "linux", target_os = "macos")))]

@@ -14,8 +14,9 @@
   };
   type HotkeyStatus =
     | { kind: "niri"; included: boolean; include_line: string }
-    | { kind: "manual"; command: string }
-    | { kind: "native" };
+    | { kind: "manual"; command: string; snippet: string | null }
+    | { kind: "x11" }
+    | { kind: "mac" };
   type Permissions = { microphone: boolean; accessibility: boolean };
   type Download =
     | { kind: "running"; done: number; total: number }
@@ -42,8 +43,8 @@
   const mb = (bytes: number) => Math.round(bytes / 1e6).toLocaleString("da-DK");
 
   // macOS: an event tap takes the key, fn unless another is chosen
-  const native = $derived(status?.kind === "native");
-  const hotkey = $derived(settings?.hotkey ?? (native ? "Fn" : null));
+  const mac = $derived(status?.kind === "mac");
+  const hotkey = $derived(settings?.hotkey ?? (mac ? "Fn" : null));
 
   const ASK = [
     { what: "microphone", name: "Mikrofon", why: "Så Eckermann kan høre dig." },
@@ -114,7 +115,7 @@
       capturing = false;
       return;
     }
-    const combo = comboFromEvent(e, native);
+    const combo = comboFromEvent(e, mac);
     if (!combo) return;
     capturing = false;
     await setHotkey(combo);
@@ -187,7 +188,7 @@
           {#if status?.kind === "manual"}
             Giv denne kommando en genvej i dit skrivebords indstillinger.
           {:else if capturing}
-            Bogstaver, tal og mellemrum kræver {native ? "⌃, ⌥, ⇧ eller ⌘" : "Ctrl, Alt, Shift eller Super"}.
+            Bogstaver, tal og mellemrum kræver {mac ? "⌃, ⌥, ⇧ eller ⌘" : "Ctrl, Alt, Shift eller Super"}.
           {:else}
             Tryk én gang for at tale og igen for at stoppe.
           {/if}
@@ -200,9 +201,9 @@
             <button onclick={() => (capturing = false)}>Fortryd</button>
           {:else}
             {#if hotkey}
-              {#each keyCaps(hotkey, native) as key}<kbd>{key}</kbd>{/each}
+              {#each keyCaps(hotkey, mac) as key}<kbd>{key}</kbd>{/each}
             {/if}
-            {#if native && hotkey !== "Fn"}
+            {#if mac && hotkey !== "Fn"}
               <button onclick={() => setHotkey("Fn")}>Brug fn</button>
             {/if}
             <button onclick={capture}>{hotkey ? "Skift" : "Vælg"}</button>
@@ -212,10 +213,14 @@
     </div>
     {#if status?.kind === "manual"}
       <code>{status.command}</code>
+      {#if status.snippet}
+        <p class="hint">For eksempel med F2 i din konfiguration:</p>
+        <code>{status.snippet}</code>
+      {/if}
     {:else if status?.kind === "niri" && !status.included}
       <p class="hint">Tilføj denne linje sidst i din niri-konfiguration:</p>
       <code>{status.include_line}</code>
-    {:else if native && hotkey === "Fn"}
+    {:else if mac && hotkey === "Fn"}
       <p class="hint">Vælg under Tastatur i Systemindstillinger, at 🌐-tasten ikke skal gøre noget.</p>
     {/if}
 

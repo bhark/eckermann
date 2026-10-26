@@ -14,6 +14,8 @@ pub mod punct;
 mod settings;
 pub mod stt;
 pub mod text;
+#[cfg(target_os = "linux")]
+mod x11;
 
 use ipc::Command;
 use pipeline::Pipeline;
@@ -243,6 +245,7 @@ async fn install_update(app: &AppHandle) -> tauri_plugin_updater::Result<bool> {
 // the panel plus the transparent margin around it, as in Settings.svelte
 const SETTINGS_WIDTH: i32 = 496;
 const SETTINGS_HEIGHT: i32 = 720;
+#[cfg(target_os = "linux")]
 const SETTINGS_MARGIN: i32 = 28;
 
 fn show_settings(app: &AppHandle) {

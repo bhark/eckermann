@@ -5,17 +5,19 @@ use gtk::cairo::{RectangleInt, Region};
 use gtk::prelude::*;
 use gtk_layer_shell::{Edge, KeyboardMode, Layer, LayerShell};
 
-/// Bottom centre, above everything, without keyboard or pointer input.
-pub fn overlay(window: &gtk::ApplicationWindow, width: i32, height: i32) {
+/// Bottom centre, above everything, without keyboard or pointer input; false without
+/// layer-shell, which leaves a plain window that clicks still fall through.
+pub fn overlay(window: &gtk::ApplicationWindow, width: i32, height: i32) -> bool {
+    // empty input region: clicks fall through to the window below
+    window.input_shape_combine_region(Some(&Region::create()));
     if !init(window, "eckermann", width, height) {
-        return;
+        return false;
     }
     window.set_layer(Layer::Overlay);
     // no margin: the page rises from the screen edge, and its padding sets the gap
     window.set_anchor(Edge::Bottom, true);
     window.set_keyboard_mode(KeyboardMode::None);
-    // empty input region: clicks fall through to the window below
-    window.input_shape_combine_region(Some(&Region::create()));
+    true
 }
 
 /// Centred panel that takes the keyboard when clicked. `margin` is the transparent

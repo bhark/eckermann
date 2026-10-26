@@ -28,6 +28,8 @@ impl Shown {
 pub struct Overlay {
     app: AppHandle,
     shown: Mutex<Shown>,
+    // false where the window would take the focus, and with it the paste
+    usable: bool,
 }
 
 impl Overlay {
@@ -48,10 +50,17 @@ impl Overlay {
             .visible(false)
             .build()?;
         #[cfg(target_os = "linux")]
-        crate::layer::overlay(&window.gtk_window()?, WIDTH, HEIGHT);
-        #[cfg(target_os = "macos")]
-        {
-            // no layer-shell: click-through, and on the screen's bottom edge above the dock
+        let layered = crate::layer::overlay(&window.gtk_window()?, WIDTH, HEIGHT);
+        #[cfg(not(target_os = "linux"))]
+        let layered = false;
+        // a plain wayland window gets the focus; an X11 one that refuses it does not
+        #[cfg(target_os = "linux")]
+        let usable = layered || crate::x11::session();
+        #[cfg(not(target_os = "linux"))]
+        let usable = true;
+        if usable && !layered {
+            // on the bottom edge of the work area, so above a dock; gtk got its input region in layer::overlay
+            #[cfg(target_os = "macos")]
             window.set_ignore_cursor_events(true)?;
             if let Some(monitor) = window.primary_monitor()? {
                 let area = monitor.work_area();
@@ -66,6 +75,7 @@ impl Overlay {
         let overlay = Arc::new(Self {
             app: app.clone(),
             shown: Mutex::new(Shown::default()),
+            usable,
         });
         let left = overlay.clone();
         app.listen("overlay-left", move |_| left.left());
@@ -73,6 +83,12 @@ impl Overlay {
     }
 
     pub fn handle(self: &Arc<Self>, event: Event) {
+        if !self.usable {
+            if let Event::Notice(text) = event {
+                notify(&text);
+            }
+            return;
+        }
         let mut shown = self.shown.lock().unwrap();
         match &event {
             Event::Recording(on) => shown.recording = *on,
@@ -124,5 +140,16 @@ impl Overlay {
         {
             let _ = window.hide();
         }
+    }
+}
+
+/// A desktop notification, for where the overlay cannot show.
+fn notify(text: &str) {
+    // ponytail: libnotify's command; the notification portal if a desktop lacks it
+    let sent = std::process::Command::new("notify-send")
+        .args(["--app-name=Eckermann", "Eckermann", text])
+        .spawn();
+    if let Err(e) = sent {
+        log::warn!("notify-send: {e}; notice was {text:?}");
     }
 }
