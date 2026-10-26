@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "enables the default permissions",
   "windows": ["settings", "overlay"],
-  "permissions": ["core:default", "core:window:allow-close"]
+  "permissions": ["core:default", "core:window:allow-close", "core:window:allow-start-dragging"]
 }

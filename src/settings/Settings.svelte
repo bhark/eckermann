@@ -183,12 +183,13 @@
   </button>
 
   <div class="content" bind:this={content}>
-    <header>
-      <canvas class="ball" bind:this={canvas}></canvas>
-      <div>
-        <h1>Eckermann</h1>
-        <p class="dedication">Til Rune</p>
-        {#if version}<p>Version {version}</p>{/if}
+    <!-- the drag region covers only the element that carries it, not its children -->
+    <header data-tauri-drag-region>
+      <canvas class="ball" bind:this={canvas} data-tauri-drag-region></canvas>
+      <div data-tauri-drag-region>
+        <h1 data-tauri-drag-region>Eckermann</h1>
+        <p class="dedication" data-tauri-drag-region>Til Rune</p>
+        {#if version}<p data-tauri-drag-region>Version {version}</p>{/if}
       </div>
     </header>
 
