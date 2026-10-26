@@ -230,9 +230,8 @@ impl Joiner {
         let typed = self.typed.trim_end_matches(' ');
         let rest = match typed.trim_end_matches('\n') {
             fewer if fewer.len() < typed.len() => fewer,
-            _ => typed
-                .trim_end_matches(|c: char| !c.is_alphanumeric() && !c.is_whitespace())
-                .trim_end_matches(char::is_alphanumeric),
+            // to the space before, so "e-mail" or "14.30" goes whole
+            _ => typed.trim_end_matches(|c: char| !c.is_whitespace()),
         };
         self.cut(rest.trim_end_matches(' ').len());
         self.tail = match self.typed.chars().last() {
@@ -614,6 +613,15 @@ mod tests {
         assert_eq!(typed(&["Først ny linje", "slet", "så", ""]), "Først så. ");
         assert_eq!(typed(&["Hej punktum", "slet slet", "Davs", ""]), "Davs. ");
         assert_eq!(typed(&["slet", ""]), "");
+        // a word with marks inside goes whole
+        assert_eq!(
+            typed(&["Send en e-mail", "slet", "besked punktum", ""]),
+            "Send en besked. "
+        );
+        assert_eq!(
+            typed(&["Mødet er kl. 14.30", "slet", "15 punktum", ""]),
+            "Mødet er kl. 15. "
+        );
         // inside a sentence it is a word
         assert_eq!(
             typed(&["Han kom sent semikolon hun kom slet ikke punktum", ""]),
