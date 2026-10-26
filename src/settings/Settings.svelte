@@ -5,6 +5,7 @@
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import { flow } from "../flow";
   import { comboFromEvent, keyCaps } from "./combo";
+  import Picker from "./Picker.svelte";
 
   type Settings = {
     trailing_space: boolean;
@@ -44,6 +45,13 @@
   invoke<boolean>("autostart").then((on) => (autostart = on));
   const refreshMics = () => invoke<Mic[]>("microphones").then((m) => (mics = m));
   refreshMics();
+  const micOptions = $derived([
+    { value: null, label: "Systemets standard" },
+    ...mics.map((m) => ({ value: m.id, label: m.name })),
+    ...(settings?.mic && !mics.some((m) => m.id === settings?.mic)
+      ? [{ value: settings.mic, label: "Ikke tilsluttet" }]
+      : []),
+  ]);
 
   const mb = (bytes: number) => Math.round(bytes / 1e6).toLocaleString("da-DK");
 
@@ -230,18 +238,10 @@
       <p class="hint">Vælg under Tastatur i Systemindstillinger, at 🌐-tasten ikke skal gøre noget.</p>
     {/if}
 
-    <label class="row">
-      <span>Mikrofon</span>
-      <select bind:value={settings.mic} onchange={save}>
-        <option value={null}>Systemets standard</option>
-        {#each mics as mic (mic.id)}
-          <option value={mic.id}>{mic.name}</option>
-        {/each}
-        {#if settings.mic && !mics.some((m) => m.id === settings?.mic)}
-          <option value={settings.mic}>Ikke tilsluttet</option>
-        {/if}
-      </select>
-    </label>
+    <div class="row">
+      <span id="mic-label">Mikrofon</span>
+      <Picker options={micOptions} bind:value={settings.mic} labelledby="mic-label" onchange={save} />
+    </div>
 
     <label class="row">
       <span>
@@ -447,20 +447,6 @@
     text-align: right;
     appearance: textfield;
   }
-  select {
-    box-sizing: border-box;
-    min-width: 0;
-    max-width: 16em;
-    height: var(--control);
-    padding: 0 8px;
-    border: 1px solid rgb(255 255 255 / 0.1);
-    border-radius: 8px;
-    background: rgb(255 255 255 / 0.05);
-    color: var(--text);
-    color-scheme: dark;
-    font: inherit;
-    font-size: 15px;
-  }
   input[type="number"]::-webkit-inner-spin-button,
   input[type="number"]::-webkit-outer-spin-button {
     appearance: none;
@@ -495,7 +481,7 @@
   .switch:checked::before {
     translate: 18px 0;
   }
-  :is(button, input, select):focus-visible {
+  :is(button, input):focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
   }
