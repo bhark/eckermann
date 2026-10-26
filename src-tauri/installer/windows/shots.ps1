@@ -13,7 +13,8 @@ public static class W {
 "@
 [W]::SetProcessDPIAware() | Out-Null
 New-Item -ItemType Directory -Force $Out | Out-Null
-$setup = (Resolve-Path src-tauri/target/release/bundle/nsis/*-setup.exe).Path
+$target = if ($env:CARGO_TARGET_DIR) { $env:CARGO_TARGET_DIR } else { "src-tauri/target" }
+$setup = (Resolve-Path "$target/release/bundle/nsis/*-setup.exe").Path
 
 function Window($p) {
   for ($i = 0; $i -lt 60; $i++) {
