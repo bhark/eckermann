@@ -23,6 +23,16 @@ updates:
         # own pr: every bump needs a diff of upstream's installer.nsi against our fork
         exclude-patterns: ["@tauri-apps/cli"]
 
+  - package-ecosystem: pip
+    directory: /src-tauri/installer
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      dmg:
+        update-types: [minor, patch]
+
   - package-ecosystem: cargo
     directory: /src-tauri
     schedule:
