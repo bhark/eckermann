@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400" viewBox="0 0 640 400">
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="42%" r="70%">
+      <stop offset="0" stop-color="#f2f0ec"/>
+      <stop offset="1" stop-color="#e2ded6"/>
+    </radialGradient>
+    <filter id="grain" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="3" stitchTiles="stitch"/>
+      <feColorMatrix type="saturate" values="0"/>
+    </filter>
+    <!-- fine holes in the strands, as the orb's grain punches them -->
+    <filter id="holes" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="1.6" numOctaves="2" seed="7"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 -3 2.75"/>
+    </filter>
+    <mask id="worn" maskUnits="userSpaceOnUse" x="0" y="0" width="640" height="400">
+      <rect width="640" height="400" filter="url(#holes)"/>
+    </mask>
+  </defs>
+  <rect width="640" height="400" fill="url(#glow)"/>
+  <rect width="640" height="400" filter="url(#grain)" opacity="0.05"/>
+  <g mask="url(#worn)" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M262 210 C 300 198, 318 166, 364 176" stroke="#c86a41" stroke-width="3.5"/>
+    <path d="M258 200 C 292 168, 336 166, 378 192" stroke="#d8a64f" stroke-width="6"/>
+    <path d="M371.7 177.2 L 378 192 L 362 193" stroke="#d8a64f" stroke-width="6"/>
+  </g>
+</svg>

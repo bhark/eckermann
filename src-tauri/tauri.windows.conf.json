@@ -2,6 +2,18 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "bundle": {
     "targets": ["nsis"],
-    "resources": { "target/vulkan/vulkan-1.dll": "vulkan-1.dll" }
+    "publisher": "FORN",
+    "resources": { "target/vulkan/vulkan-1.dll": "vulkan-1.dll" },
+    "windows": {
+      "nsis": {
+        "template": "installer/windows/installer.nsi",
+        "installerHooks": "installer/windows/look.nsh",
+        "languages": ["English", "Danish"],
+        "customLanguageFiles": {
+          "English": "installer/windows/English.nsh",
+          "Danish": "installer/windows/Danish.nsh"
+        }
+      }
+    }
   }
 }
