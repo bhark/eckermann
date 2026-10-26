@@ -9,10 +9,8 @@ magick ../../../app-icon.png -crop 612x612+205+205 +repage \
   \( -size 612x612 xc:black -fill white -draw "circle 306,306 306,1.5" -blur 0x0.8 \) \
   -alpha off -compose CopyOpacity -composite "$orb"
 
-for variant in dark light; do
-  rsvg-convert dmg-$variant.svg -o dmg-$variant.png
-  rsvg-convert -z 2 dmg-$variant.svg -o dmg-$variant@2x.png
-done
+rsvg-convert dmg.svg -o dmg.png
+rsvg-convert -z 2 dmg.svg -o dmg@2x.png
 
 # windows pages at 100 to 200 % scaling; bmp has no alpha, so the orb sits on the page colour
 for size in 96 120 144 168 192; do

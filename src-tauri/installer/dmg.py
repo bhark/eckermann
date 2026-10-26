@@ -4,7 +4,7 @@ symlinks = {"Applications": "/Applications"}
 hide_extensions = ["Eckermann.app"]
 icon = "icons/icon.icns"
 # the @2x png beside it makes a retina tiff
-background = f"installer/art/dmg-{defines['look']}.png"
+background = "installer/art/dmg.png"
 format = "ULFO"
 window_rect = ((200, 120), (640, 400))
 text_size = 13
