@@ -94,6 +94,9 @@ jobs:
           releaseName: Eckermann ${{ github.ref_name }}
           releaseBody: ${{ needs.notes.outputs.body }}
           releaseDraft: true
+          # versionless names, so the site can link releases/latest/download/<file>
+          # ponytail: one arch per os; add [arch] when a second one ships
+          releaseAssetNamePattern: "[name][ext]"
       # each leg matches only its own installers
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
