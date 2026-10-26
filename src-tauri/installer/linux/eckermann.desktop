@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Name={{name}}
+GenericName=Dictation
+GenericName[da]=Diktering
+Comment={{comment}}
+Comment[da]=Lokal diktering i alle programmer
+Keywords=dictation;speech;voice;transcription;
+Keywords[da]=diktering;tale;stemme;
+Categories=Utility;Accessibility;
+Exec={{exec}}
+StartupWMClass={{exec}}
+Icon={{icon}}
+Terminal=false

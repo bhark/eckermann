@@ -1,0 +1,19 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "bundle": {
+    "longDescription": "Press a shortcut and speak, and Eckermann writes what you say where you type, in English or Danish. The speech models run on your own computer and download once, on first start.",
+    "linux": {
+      "deb": {
+        "desktopTemplate": "installer/linux/eckermann.desktop",
+        "files": { "/usr/share/metainfo/dk.forn.eckermann.metainfo.xml": "installer/linux/dk.forn.eckermann.metainfo.xml" }
+      },
+      "rpm": {
+        "desktopTemplate": "installer/linux/eckermann.desktop",
+        "files": { "/usr/share/metainfo/dk.forn.eckermann.metainfo.xml": "installer/linux/dk.forn.eckermann.metainfo.xml" }
+      },
+      "appimage": {
+        "files": { "/usr/share/metainfo/dk.forn.eckermann.metainfo.xml": "installer/linux/dk.forn.eckermann.metainfo.xml" }
+      }
+    }
+  }
+}

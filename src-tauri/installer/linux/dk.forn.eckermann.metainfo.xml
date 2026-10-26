@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>dk.forn.eckermann</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-only</project_license>
+  <name>Eckermann</name>
+  <summary>Local dictation into any app</summary>
+  <summary xml:lang="da">Lokal diktering i alle programmer</summary>
+  <developer id="dk.forn">
+    <name>FORN</name>
+  </developer>
+  <description>
+    <p>Press a shortcut and speak. Eckermann writes what you say where you type, in English or Danish.</p>
+    <p>The speech models run on your own computer, so your voice never leaves it. They download once, on first start.</p>
+    <p xml:lang="da">Tryk på en genvej, og tal. Eckermann skriver det, du siger, der hvor du skriver, på dansk eller engelsk.</p>
+    <p xml:lang="da">Talemodellerne kører på din egen computer, så din stemme bliver der. De hentes én gang, første gang programmet starter.</p>
+  </description>
+  <launchable type="desktop-id">Eckermann.desktop</launchable>
+  <url type="homepage">https://eckermann.forn.dk</url>
+  <url type="vcs-browser">https://github.com/bhark/eckermann</url>
+  <url type="bugtracker">https://github.com/bhark/eckermann/issues</url>
+  <screenshots>
+    <screenshot type="default">
+      <caption>Settings</caption>
+      <caption xml:lang="da">Indstillinger</caption>
+      <image>https://eckermann.forn.dk/screenshots/settings.png</image>
+    </screenshot>
+  </screenshots>
+  <content_rating type="oars-1.1"/>
+  <provides>
+    <binary>eckermann</binary>
+  </provides>
+</component>
