@@ -28,7 +28,8 @@
     ],
     "createUpdaterArtifacts": true,
     "macOS": {
-      "entitlements": "Entitlements.plist"
+      "entitlements": "Entitlements.plist",
+      "minimumSystemVersion": "13.0"
     }
   },
   "plugins": {
