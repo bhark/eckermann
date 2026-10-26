@@ -1,4 +1,7 @@
-![Eckermann, til Rune](.github/banner.png)
+<picture>
+  <source media="(prefers-reduced-motion: reduce)" srcset=".github/banner.png">
+  <img src=".github/banner.webp" alt="Eckermann, til Rune">
+</picture>
 
 Fully local, cross-platform on-device speech-to-text, surpassing subscription-based cloud solutions in both accuracy and user experience, all without your data ever leaving your machine. Eckermann is tuned for natural language writing, designed first and foremost as an accessibility tool. 
 
