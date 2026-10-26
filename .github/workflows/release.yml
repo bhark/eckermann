@@ -110,6 +110,19 @@ jobs:
           # versionless names, so the site can link releases/latest/download/<file>
           # ponytail: one arch per os; add [arch] when a second one ships
           releaseAssetNamePattern: "[name][ext]"
+          # the dmg comes from dmgbuild below
+          args: ${{ runner.os == 'macOS' && '--bundles app' || '' }}
+      # tauri's dmg gets no window layout on ci, and has no retina background or text size
+      - if: runner.os == 'macOS'
+        working-directory: src-tauri
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          mkdir -p target/release/bundle/dmg
+          installer/dmg.sh target/release/bundle/macos/Eckermann.app target/release/bundle/dmg/Eckermann.dmg
+          codesign --sign "$APPLE_SIGNING_IDENTITY" target/release/bundle/dmg/Eckermann.dmg
+          gh release upload "$TAG" -R "$GITHUB_REPOSITORY" target/release/bundle/dmg/Eckermann.dmg
       # each leg matches only its own installers
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
