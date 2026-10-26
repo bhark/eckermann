@@ -1,7 +1,7 @@
 [package]
 name = "eckermann"
 version = "0.1.0"
-description = "Local Danish hold-to-talk dictation"
+description = "Local dictation into any app"
 license = "GPL-3.0-only"
 edition = "2024"
 rust-version = "1.91"
@@ -32,6 +32,7 @@ rustls = { version = "0.23", default-features = false, features = ["ring", "std"
 sha2 = "0.10"
 tauri-plugin-autostart = "2.7"
 tauri-plugin-updater = "2.14"
+sys-locale = "0.3"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 libc = "0.2"

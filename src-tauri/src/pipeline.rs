@@ -3,20 +3,18 @@
 //! and one typist pastes them in that order.
 
 use crate::audio::{RATE, Recorder};
+use crate::models;
 use crate::paste::Paster;
 use crate::punct::{Label, Punctuator};
 use crate::settings::Settings;
 use crate::stt::{Stt, Vad};
 use crate::text::{Edit, Joiner};
+use crate::ui::{Text, text};
 use std::ops::Range;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering::SeqCst};
 use std::sync::{Arc, Mutex, mpsc};
 use std::time::{Duration, Instant};
-
-pub const MODEL_FILE: &str = "ggml-edda-v0.2-q8_0.bin";
-pub const VAD_FILE: &str = "ggml-silero-v6.2.0.bin";
-pub const PUNCT_DIR: &str = "punct-da";
 
 // shorter presses are accidental taps
 const MIN_PRESS: Duration = Duration::from_millis(300);
@@ -28,11 +26,6 @@ const SETTLE: usize = RATE as usize / 2;
 const PREVIEW_EVERY: Duration = Duration::from_millis(700);
 // whisper's window; a preview of a longer phrase shows only its end
 const PREVIEW_MAX: usize = 28 * RATE as usize;
-
-#[cfg(target_os = "macos")]
-const PASTE_BY_HAND: &str = "Teksten ligger i udklipsholderen. Indsæt den med ⌘V.";
-#[cfg(not(target_os = "macos"))]
-const PASTE_BY_HAND: &str = "Teksten ligger i udklipsholderen. Indsæt den med Ctrl+V.";
 
 /// What the overlay shows.
 #[derive(Clone, serde::Serialize)]
@@ -158,7 +151,7 @@ impl Pipeline {
             previewing: AtomicBool::new(false),
             stale_preview: AtomicBool::new(false),
         });
-        let vad = models.join(VAD_FILE);
+        let vad = models.join(models::VAD.path);
         let segmenter_live = live.clone();
         std::thread::spawn(move || segmenter(&segmenter_live, wake_rx, &vad));
         let (edits, edit_rx) = mpsc::channel();
@@ -190,7 +183,7 @@ impl Pipeline {
             }
             Err(e) => {
                 log::error!("microphone: {e}");
-                self.live.notice("Mikrofonen kunne ikke startes.");
+                self.live.notice(text(Text::MicFailed));
             }
         }
     }
@@ -284,7 +277,8 @@ fn phrase_end(last: Option<&Range<usize>>, len: usize, pause: usize) -> Option<u
 fn worker(live: &Live, rx: mpsc::Receiver<Job>, edits: mpsc::Sender<Edit>, models: &Path) {
     let mut stt: Option<Stt> = None;
     let mut punct: Option<Punctuator> = None;
-    let mut joiner = Joiner::default();
+    let mut language = live.settings.lock().unwrap().language;
+    let mut joiner = Joiner::new(language.profile());
     // development only: each phrase as audio and text, for examples/dictation_eval
     let keep = std::env::var_os("ECKERMANN_KEEP_AUDIO").map(PathBuf::from);
     let mut kept: Option<(u64, usize)> = None;
@@ -311,9 +305,18 @@ fn worker(live: &Live, rx: mpsc::Receiver<Job>, edits: mpsc::Sender<Edit>, model
                 Err(_) => return,
             },
         };
+        // a new language takes effect when a dictation starts, never inside one
+        let wanted = live.settings.lock().unwrap().language;
+        if matches!(job, Job::Warm) && wanted != language {
+            log::info!("dictating in {wanted:?} from now on");
+            (stt, punct, language) = (None, None, wanted);
+            joiner = Joiner::new(language.profile());
+        }
         if stt.is_none() {
             let t = Instant::now();
-            match Stt::load(&models.join(MODEL_FILE), &models.join(VAD_FILE)) {
+            let profile = language.profile();
+            let speech = models.join(profile.speech.path);
+            match Stt::load(&speech, &models.join(models::VAD.path), profile) {
                 Ok(loaded) => {
                     log::info!("speech model loaded in {:.2}s", t.elapsed().as_secs_f32());
                     stt = Some(loaded);
@@ -321,14 +324,14 @@ fn worker(live: &Live, rx: mpsc::Receiver<Job>, edits: mpsc::Sender<Edit>, model
                 Err(e) => log::error!("{e}"),
             }
             // without it, dictation still works with whisper's own marks
-            match Punctuator::load(&models.join(PUNCT_DIR)) {
+            match Punctuator::load(&models.join(profile.punct_dir)) {
                 Ok(loaded) => punct = Some(loaded),
                 Err(e) => log::error!("punctuation model: {e}"),
             }
         }
         let Some(model) = stt.as_mut() else {
             match job {
-                Job::Warm => live.notice("Talemodellen kunne ikke indlæses."),
+                Job::Warm => live.notice(text(Text::ModelFailed)),
                 Job::Preview(_) => live.previewing.store(false, SeqCst),
                 Job::Phrase { .. } => live.phrase_done(),
             }
@@ -383,14 +386,14 @@ fn typist(live: &Live, edits: mpsc::Receiver<Edit>) {
         if !edit.is_empty() {
             match paster.as_mut().map(|p| p.apply(&edit)) {
                 Some(Ok(true)) => {}
-                Some(Ok(false)) => live.notice(PASTE_BY_HAND),
+                Some(Ok(false)) => live.notice(text(Text::PasteByHand)),
                 Some(Err(e)) => {
                     log::error!("paste: {e}");
-                    live.notice("Teksten kunne ikke indsættes.");
+                    live.notice(text(Text::PasteFailed));
                 }
                 None => {
                     log::error!("no clipboard; lost {edit:?}");
-                    live.notice("Teksten kunne ikke indsættes.");
+                    live.notice(text(Text::PasteFailed));
                 }
             }
         }

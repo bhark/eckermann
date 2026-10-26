@@ -1,29 +1,32 @@
 //! The model files, fetched once from a pinned revision and checked by size and SHA-256.
 
+use crate::lang::Profile;
 use sha2::{Digest, Sha256};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
 const BASE: &str =
-    "https://huggingface.co/FORNstudio/eckermann/resolve/1d805e0ff529188e6faa1bee5d26ec3934af39dc";
+    "https://huggingface.co/FORNstudio/eckermann/resolve/da4b1baaeddc6f77032f5ce26ab2be72a5b01714";
 
 pub struct File {
-    path: &'static str,
+    pub path: &'static str,
     size: u64,
     sha256: &'static str,
 }
 
-const FILES: [File; 5] = [
-    File {
-        path: "ggml-edda-v0.2-q8_0.bin",
-        size: 874_188_075,
-        sha256: "976dd84ac3e4e209d8c77de921d6fd0e42b624470578cd897bef653a97e6b4b7",
-    },
-    File {
-        path: "ggml-silero-v6.2.0.bin",
-        size: 885_098,
-        sha256: "2aa269b785eeb53a82983a20501ddf7c1d9c48e33ab63a41391ac6c9f7fb6987",
-    },
+pub const VAD: File = File {
+    path: "ggml-silero-v6.2.0.bin",
+    size: 885_098,
+    sha256: "2aa269b785eeb53a82983a20501ddf7c1d9c48e33ab63a41391ac6c9f7fb6987",
+};
+
+pub const EDDA: File = File {
+    path: "ggml-edda-v0.2-q8_0.bin",
+    size: 874_188_075,
+    sha256: "976dd84ac3e4e209d8c77de921d6fd0e42b624470578cd897bef653a97e6b4b7",
+};
+
+pub const PUNCT_DA: [File; 3] = [
     File {
         path: "punct-da/config.json",
         size: 1_534,
@@ -41,10 +44,35 @@ const FILES: [File; 5] = [
     },
 ];
 
-/// Files not yet in `dir`.
-pub fn missing(dir: &Path) -> Vec<&'static File> {
-    FILES
-        .iter()
+pub const TURBO: File = File {
+    path: "ggml-large-v3-turbo-q8_0.bin",
+    size: 874_188_075,
+    sha256: "317eb69c11673c9de1e1f0d459b253999804ec71ac4c23c17ecf5fbe24e259a1",
+};
+
+pub const PUNCT_EN: [File; 3] = [
+    File {
+        path: "punct-en/config.json",
+        size: 1_086,
+        sha256: "9be3c2cabfbfe94f855ec931b53183b320ebb5418aaec96c81c2587cc5f0623f",
+    },
+    File {
+        path: "punct-en/model.safetensors",
+        size: 217_829_558,
+        sha256: "65aa41f7ce487063656dbda4b3e78bc54680bae2d91c254d78e6c02545a1256a",
+    },
+    File {
+        path: "punct-en/vocab.txt",
+        size: 231_508,
+        sha256: "07eced375cec144d27c900241f3e339478dec958f92fddbc551f295c992038a3",
+    },
+];
+
+/// Files not yet in `dir` that dictating in `profile`'s language needs.
+pub fn missing(dir: &Path, profile: &Profile) -> Vec<&'static File> {
+    [&VAD, profile.speech]
+        .into_iter()
+        .chain(profile.punct_files)
         .filter(|f| !std::fs::metadata(dir.join(f.path)).is_ok_and(|m| m.len() == f.size))
         .collect()
 }

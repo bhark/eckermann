@@ -1,5 +1,5 @@
-//! Natural punctuation and capitals: a Danish BERT that gives each word the mark after it
-//! and its case (Alvenir/bert-punct-restoration-da, converted by bench/punct_model.py).
+//! Natural punctuation and capitals: a BERT that gives each word the mark after it and its
+//! case, one per language (converted by bench/punct_model.py).
 
 use candle_core::{D, DType, Device, Tensor};
 use candle_nn::{Linear, Module, VarBuilder};
@@ -176,12 +176,54 @@ impl Punctuator {
 mod tests {
     use super::*;
 
+    fn load(folder: &str) -> Option<Punctuator> {
+        let home = std::env::var_os("HOME").unwrap_or_default();
+        let dir = Path::new(&home)
+            .join(".local/share/dk.forn.eckermann/models")
+            .join(folder);
+        Punctuator::load(&dir)
+            .inspect_err(|_| eprintln!("skipped: no model in {}", dir.display()))
+            .ok()
+    }
+
+    #[test]
+    fn splits_english_words_like_bert() {
+        let Some(p) = load("punct-en") else {
+            return;
+        };
+        // ids from python's BertTokenizer, fed words as the app feeds them
+        let cases: [(&str, &[u32]); 3] = [
+            (
+                "rudolf steiner said that goethe's work",
+                &[12794, 21264, 2056, 2008, 23173, 1055, 2147],
+            ),
+            (
+                "it's a black-white film in aarhus",
+                &[2009, 1055, 1037, 2304, 2317, 2143, 1999, 29173],
+            ),
+            (
+                "xqzzyvw 2026 kierkegaard",
+                &[
+                    1060, 4160, 28753, 2615, 2860, 16798, 2575, 11382, 2121, 3489, 18839,
+                ],
+            ),
+        ];
+        for (text, want) in cases {
+            let got: Vec<u32> = text.split(' ').flat_map(|w| p.pieces(w)).collect();
+            assert_eq!(got, want, "{text}");
+        }
+        let words: Vec<String> = "what is your name my name is peter"
+            .split(' ')
+            .map(String::from)
+            .collect();
+        let labels = p.label(&words).unwrap();
+        assert_eq!(labels[3].mark, Some('?'));
+        assert!(labels[7].capital);
+    }
+
     #[test]
     fn splits_words_like_bert() {
-        let home = std::env::var_os("HOME").unwrap_or_default();
-        let dir = Path::new(&home).join(".local/share/dk.forn.eckermann/models/punct-da");
-        let Ok(p) = Punctuator::load(&dir) else {
-            eprintln!("skipped: no model in {}", dir.display());
+        let Some(p) = load("punct-da") else {
             return;
         };
         // ids from python's BertTokenizer on the same vocab

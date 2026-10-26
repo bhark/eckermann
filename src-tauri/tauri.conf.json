@@ -29,7 +29,10 @@
     "createUpdaterArtifacts": true,
     "macOS": {
       "entitlements": "Entitlements.plist",
-      "minimumSystemVersion": "13.0"
+      "minimumSystemVersion": "13.0",
+      "files": {
+        "Resources/da.lproj/InfoPlist.strings": "macos/da.lproj/InfoPlist.strings"
+      }
     }
   },
   "plugins": {

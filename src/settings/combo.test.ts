@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { comboFromEvent, keyCaps } from "./combo";
+import { da } from "./i18n";
 
 const ev = (key: string, code: string, mods: Partial<Record<"ctrlKey" | "altKey" | "shiftKey" | "metaKey", boolean>> = {}) => ({
   key,
@@ -30,12 +31,13 @@ test("names letters by their place for macOS", () => {
   expect(comboFromEvent(ev("a", "KeyQ", { metaKey: true }), true)).toBe("Super+Q");
   expect(comboFromEvent(ev("æ", "Semicolon", { altKey: true }), true)).toBe("Alt+ae");
   expect(comboFromEvent(ev(",", "Comma", { ctrlKey: true }), true)).toBeNull();
-  expect(keyCaps("Ctrl+Super+Space", true)).toEqual(["⌃", "⌘", "Mellemrum"]);
+  expect(keyCaps("Ctrl+Super+Space", true, da.keys)).toEqual(["⌃", "⌘", "Mellemrum"]);
   expect(keyCaps("Fn", true)).toEqual(["fn"]);
 });
 
-test("names key caps in Danish", () => {
-  expect(keyCaps("Ctrl+Alt+Space")).toEqual(["Ctrl", "Alt", "Mellemrum"]);
+test("names key caps in the UI's language", () => {
+  expect(keyCaps("Ctrl+Alt+Space", false, da.keys)).toEqual(["Ctrl", "Alt", "Mellemrum"]);
+  expect(keyCaps("Ctrl+BackSpace")).toEqual(["Ctrl", "BackSpace"]);
   expect(keyCaps("Super+oslash")).toEqual(["Super", "Ø"]);
   expect(keyCaps("F2")).toEqual(["F2"]);
 });

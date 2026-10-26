@@ -1,6 +1,7 @@
 //! Runs whole dictations through the app's path (speech model, commands, punctuation,
 //! joining) and compares the text they type with what was meant.
-//! cargo run --release --example dictation_eval -- MODEL.bin VAD.bin PUNCT_DIR CASES.tsv [N]
+//! cargo run --release --example dictation_eval -- LANGUAGE MODEL.bin VAD.bin PUNCT_DIR CASES.tsv [N]
+//! LANGUAGE is da or en; PUNCT_DIR none keeps whisper's own marks.
 //! A case is `reference \t audio`: `|` separates phrases, `+` joins clips into one phrase
 //! with a pause between them. Paths are relative to CASES.tsv, `\n` in a reference is a line break.
 
@@ -8,6 +9,7 @@
 mod wav;
 
 use eckermann_lib::commands::distance;
+use eckermann_lib::lang::Language;
 use eckermann_lib::punct::Punctuator;
 use eckermann_lib::stt::Stt;
 use eckermann_lib::text::Joiner;
@@ -109,8 +111,14 @@ fn aligned(a: &[(String, char)], b: &[(String, char)]) -> Vec<(usize, usize)> {
 
 fn main() -> Result<(), String> {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    let [model, vad, punct_dir, cases, rest @ ..] = args.as_slice() else {
-        return Err("usage: dictation_eval MODEL.bin VAD.bin PUNCT_DIR CASES.tsv [N]".into());
+    let usage = "usage: dictation_eval LANGUAGE MODEL.bin VAD.bin PUNCT_DIR CASES.tsv [N]";
+    let [language, model, vad, punct_dir, cases, rest @ ..] = args.as_slice() else {
+        return Err(usage.into());
+    };
+    let language = match language.as_str() {
+        "da" => Language::Da,
+        "en" => Language::En,
+        _ => return Err(usage.into()),
     };
     let n: usize = rest
         .first()
@@ -118,8 +126,12 @@ fn main() -> Result<(), String> {
         .map_err(|e| format!("N: {e}"))?;
     let dir = Path::new(cases).parent().unwrap_or(Path::new("."));
     let rows = std::fs::read_to_string(cases).map_err(|e| format!("{cases}: {e}"))?;
-    let mut stt = Stt::load(Path::new(model), Path::new(vad))?;
-    let punctuator = Punctuator::load(Path::new(punct_dir))?;
+    let profile = language.profile();
+    let mut stt = Stt::load(Path::new(model), Path::new(vad), profile)?;
+    let punctuator = match punct_dir.as_str() {
+        "none" => None,
+        dir => Some(Punctuator::load(Path::new(dir))?),
+    };
     let (mut punct_runs, mut punct_seconds) = (0, 0.0);
     let (mut cases, mut exact, mut lost) = (0, 0, 0);
     let (mut word_errors, mut ref_words, mut mark_errors, mut ref_marks) = (0, 0, 0, 0);
@@ -129,7 +141,7 @@ fn main() -> Result<(), String> {
     for row in rows.lines().filter(|l| !l.is_empty()).take(n) {
         let (reference, audio) = row.split_once('\t').ok_or(format!("no tab: {row}"))?;
         let reference = reference.replace("\\n", "\n");
-        let mut joiner = Joiner::default();
+        let mut joiner = Joiner::new(profile);
         let mut doc = String::new();
         let parts: Vec<&str> = audio.split('|').collect();
         let mut heard = Vec::new();
@@ -146,6 +158,9 @@ fn main() -> Result<(), String> {
             seconds += t.elapsed().as_secs_f32();
             phrases += 1;
             let label = |words: &[String]| {
+                let Some(punctuator) = &punctuator else {
+                    return Vec::new();
+                };
                 let t = Instant::now();
                 let labels = punctuator
                     .label(words)

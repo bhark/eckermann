@@ -1,7 +1,8 @@
 //! Spoken commands: words that type a mark or edit the text instead of themselves.
+//! The phrasings come from the language's profile.
 
+use crate::lang::Profile;
 use Action::{Delete, Mark};
-use Fit::{Apart, Join, Left, Line, Quote, Right};
 
 /// The marks whisper itself writes after words.
 pub const MARKS: [char; 6] = ['.', ',', '!', '?', ':', ';'];
@@ -30,40 +31,8 @@ pub enum Action {
     Delete,
 }
 
-/// Every command with its phrasings, in lowercase.
-const COMMANDS: [(&[&str], Action); 16] = [
-    (&["nyt afsnit"], Mark("\n\n", Line)),
-    (
-        &[
-            "ny linje",
-            "ny linie",
-            "nye linje",
-            "nye linie",
-            "linjeskift",
-            "linieskift",
-        ],
-        Mark("\n", Line),
-    ),
-    (&["punktum"], Mark(".", Left)),
-    (&["komma", "comma"], Mark(",", Left)),
-    (&["spørgsmålstegn"], Mark("?", Left)),
-    (&["udråbstegn"], Mark("!", Left)),
-    (&["kolon"], Mark(":", Left)),
-    (&["semikolon"], Mark(";", Left)),
-    (&["apostrof"], Mark("'", Left)),
-    (&["bindestreg"], Mark("-", Join)),
-    (&["skråstreg"], Mark("/", Join)),
-    (&["tankestreg"], Mark("–", Apart)),
-    (&["citationstegn", "anførselstegn"], Mark("\"", Quote)),
-    (&["start parentes", "parentes start"], Mark("(", Right)),
-    (&["slut parentes", "parentes slut"], Mark(")", Left)),
-    (&["slet"], Delete),
-];
-
-// characters kept from whisper; edda writes junk like \ ” § where NST had a tag
-const KEEP: [char; 15] = [
-    '.', ',', '!', '?', ':', ';', '\'', '-', '–', '/', '(', ')', '%', '&', '+',
-];
+/// A command's phrasings, in lowercase, and what it does.
+pub type Command = (&'static [&'static str], Action);
 
 #[derive(Debug, PartialEq)]
 pub enum Item {
@@ -73,25 +42,26 @@ pub enum Item {
 
 /// Splits a transcribed phrase into words and commands. Editing commands count only
 /// in a phrase of commands alone, so "hun kom slet ikke" stays text.
-pub fn parse(phrase: &str) -> Vec<Item> {
-    let text = plain(phrase);
+pub fn parse(phrase: &str, profile: &Profile) -> Vec<Item> {
+    let text = plain(phrase, profile);
     let words: Vec<&str> = text.split_whitespace().collect();
-    let all = scan(&words, true);
+    let commands = profile.commands;
+    let all = scan(&words, true, commands);
     if all.iter().all(|item| matches!(item, Item::Do(_))) {
         return all;
     }
     let heard_one = all.iter().any(|item| matches!(item, Item::Do(_)));
-    if let Some(action) = misheard(&words).filter(|_| !heard_one) {
+    if let Some(action) = misheard(&words, commands).filter(|_| !heard_one) {
         return vec![Item::Do(action)];
     }
-    scan(&words, false)
+    scan(&words, false, commands)
 }
 
-fn scan(words: &[&str], editing: bool) -> Vec<Item> {
+fn scan(words: &[&str], editing: bool, commands: &'static [Command]) -> Vec<Item> {
     let mut items = Vec::new();
     let mut rest = words;
     while let Some(first) = rest.first() {
-        match command_at(rest).filter(|&(_, action)| editing || action != Delete) {
+        match command_at(rest, commands).filter(|&(_, action)| editing || action != Delete) {
             Some((len, action)) => {
                 items.push(Item::Do(action));
                 rest = &rest[len..];
@@ -105,24 +75,24 @@ fn scan(words: &[&str], editing: bool) -> Vec<Item> {
     items
 }
 
-fn phrasings() -> impl Iterator<Item = (&'static str, Action)> {
-    COMMANDS
+pub fn phrasings(commands: &'static [Command]) -> impl Iterator<Item = (&'static str, Action)> {
+    commands
         .iter()
         .flat_map(|(said, action)| said.iter().map(move |s| (*s, *action)))
 }
 
 /// The command that `words` start with, and how many words it took; the longest wins.
-fn command_at(words: &[&str]) -> Option<(usize, Action)> {
+fn command_at(words: &[&str], commands: &'static [Command]) -> Option<(usize, Action)> {
     // a lone sign is edda writing the spoken word as its mark
     if let Some(sign) = words
         .first()
         .filter(|w| w.len() == 1 && w.starts_with(MARKS))
     {
-        return phrasings()
-            .find(|(_, action)| matches!(action, Mark(m, Left) if m == sign))
+        return phrasings(commands)
+            .find(|(_, action)| matches!(action, Mark(m, Fit::Left) if m == sign))
             .map(|(_, action)| (1, action));
     }
-    phrasings()
+    phrasings(commands)
         .filter_map(|(said, action)| {
             let n = said.split(' ').count();
             let hit = n <= words.len() && said.split(' ').zip(words).all(|(s, w)| core(w) == s);
@@ -132,7 +102,7 @@ fn command_at(words: &[&str]) -> Option<(usize, Action)> {
         .or_else(|| {
             // long names are distinctive, so a word close to one is that command misheard
             let heard: Vec<char> = core(words[0]).chars().collect();
-            phrasings()
+            phrasings(commands)
                 .filter(|(said, _)| !said.contains(' '))
                 .find(|(said, _)| {
                     let said: Vec<char> = said.chars().collect();
@@ -143,7 +113,7 @@ fn command_at(words: &[&str]) -> Option<(usize, Action)> {
 }
 
 /// A short phrase said alone may be a misheard command, such as "nye linjer".
-fn misheard(words: &[&str]) -> Option<Action> {
+fn misheard(words: &[&str], commands: &'static [Command]) -> Option<Action> {
     if words.is_empty() || words.len() > 3 {
         return None;
     }
@@ -151,7 +121,7 @@ fn misheard(words: &[&str]) -> Option<Action> {
         .iter()
         .flat_map(|w| core(w).chars().collect::<Vec<_>>())
         .collect();
-    phrasings()
+    phrasings(commands)
         .filter_map(|(said, action)| {
             let said: Vec<char> = said.chars().filter(|&c| c != ' ').collect();
             // short names are too close to everyday words, such as komma and komme
@@ -186,72 +156,15 @@ pub fn distance<T: PartialEq>(a: &[T], b: &[T]) -> usize {
     row[b.len()]
 }
 
-/// Whisper's text with edda's NST tags made plain words: "land,\Komma der" reads
-/// "land komma der". Edda learned the tags from NST, whose readers said each mark aloud.
-fn plain(phrase: &str) -> String {
-    let text: String = phrase
-        .chars()
-        .filter(|&c| c.is_alphanumeric() || c.is_whitespace() || KEEP.contains(&c))
-        .collect();
-    let names: Vec<&str> = phrasings()
-        .filter(|(said, action)| !said.contains(' ') && matches!(action, Mark(..)))
-        .map(|(said, _)| said)
-        .collect();
-    // a tag is a mark's name glued to a sign, or capitalized right after a word
-    let tag_at = |rest: &str| {
-        rest.char_indices().find_map(|(i, c)| {
-            let before = rest[..i].chars().last()?;
-            let glued = MARKS.contains(&before)
-                || before == '-'
-                || (before.is_lowercase() && c.is_uppercase());
-            let name = names.iter().find(|name| {
-                let ends = |end: &str| end.chars().next().is_none_or(|c| !c.is_lowercase());
-                rest.get(i..i + name.len())
-                    .is_some_and(|w| w.to_lowercase() == **name && ends(&rest[i + name.len()..]))
-            })?;
-            glued.then_some((i, *name))
-        })
-    };
-    let mut out = String::new();
-    let mut rest = text.as_str();
-    while let Some((at, tag)) = tag_at(rest) {
-        let bare = rest[..at].trim_end_matches(MARKS);
-        // at a pause edda writes ",.\Punktum", the sign said and its habitual end
-        let said = match tag {
-            "punktum" => rest[bare.len()..at]
-                .chars()
-                .find(|&c| c != '.')
-                .and_then(name_of)
-                .unwrap_or(tag),
-            _ => tag,
-        };
-        out += &format!("{bare} {said} ");
-        rest = &rest[at + tag.len()..];
-    }
-    out += rest;
-    // edda glues signs to the next word when it drops a tag, as in "følgende,mælk"
-    let chars: Vec<char> = out.chars().collect();
-    let mut out = String::new();
-    for (i, &c) in chars.iter().enumerate() {
-        out.push(c);
-        let between = i > 0
-            && chars[i - 1].is_alphabetic()
-            && chars.get(i + 1).is_some_and(|n| n.is_alphabetic());
-        if between && c != '.' && MARKS.contains(&c) {
-            out.push(' ');
-        }
-    }
-    // runs left from removed junk, as in "land,,", stand for one sign
-    let words: Vec<String> = out
+/// The phrase's words, edda's tags repaired first, with each split compound joined again.
+fn plain(phrase: &str, profile: &Profile) -> String {
+    let repaired = profile
+        .nst_tags
+        .then(|| crate::edda::plain(phrase, profile.commands));
+    let words: Vec<&str> = repaired
+        .as_deref()
+        .unwrap_or(phrase)
         .split_whitespace()
-        .map(|word| {
-            let bare = word.trim_end_matches(MARKS);
-            let run = &word[bare.len()..];
-            match run.len() > 1 {
-                true => format!("{bare}{}", run.chars().find(|&c| c != '.').unwrap_or('.')),
-                false => word.to_string(),
-            }
-        })
         .collect();
     let mut text = String::new();
     for (i, word) in words.iter().enumerate() {
@@ -259,9 +172,9 @@ fn plain(phrase: &str) -> String {
         // "sort- hvid" is a spoken bindestreg; a split compound goes on with a conjunction
         let compound = words.get(i + 1).is_some_and(|next| {
             let next = core(next);
-            let command =
-                phrasings().any(|(said, _)| said.split(' ').next() == Some(next.as_str()));
-            !command && !["og", "eller", "samt"].contains(&next.as_str())
+            let command = phrasings(profile.commands)
+                .any(|(said, _)| said.split(' ').next() == Some(next.as_str()));
+            !command && !profile.compound_joins.contains(&next.as_str())
         });
         if !(compound && word.len() > 1 && word.ends_with('-')) {
             text.push(' ');
@@ -270,16 +183,19 @@ fn plain(phrase: &str) -> String {
     text
 }
 
-/// The spoken name of a sign whisper writes after words.
-fn name_of(sign: char) -> Option<&'static str> {
-    phrasings()
-        .find(|(_, action)| matches!(action, Mark(m, Left) if m.starts_with(sign)))
-        .map(|(said, _)| said)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::lang::Language;
+    use Fit::{Line, Right};
+
+    fn parse(phrase: &str) -> Vec<Item> {
+        super::parse(phrase, Language::Da.profile())
+    }
+
+    fn phrasings() -> impl Iterator<Item = (&'static str, Action)> {
+        super::phrasings(Language::Da.profile().commands)
+    }
 
     fn words(items: &[Item]) -> Vec<String> {
         items
@@ -358,5 +274,23 @@ mod tests {
         assert_eq!(parse("Ny Linje"), vec![Item::Do(Mark("\n", Line))]);
         assert_eq!(words(&parse("komme")).join(" "), "komme");
         assert_eq!(words(&parse("Nøhlinge")).join(" "), "Nøhlinge");
+    }
+
+    #[test]
+    fn knows_every_english_phrasing() {
+        let en = Language::En.profile();
+        for (said, action) in super::phrasings(en.commands) {
+            let items = super::parse(&format!("a {said} b"), en);
+            match action {
+                Delete => assert!(!items.contains(&Item::Do(Delete)), "{said}"),
+                _ => assert_eq!(items.get(1), Some(&Item::Do(action)), "{said}"),
+            }
+        }
+        // whisper's text is kept as it is, as only edda writes junk
+        assert_eq!(
+            words(&super::parse("It costs $20, «roughly».", en)).join(" "),
+            "It costs $20, «roughly»."
+        );
+        assert_eq!(super::parse("Scratch that.", en), vec![Item::Do(Delete)]);
     }
 }

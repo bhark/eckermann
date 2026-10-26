@@ -3,6 +3,7 @@
 //! capitals nobody said.
 
 use crate::commands::{self, Action, Fit, Item, MARKS};
+use crate::lang::Profile;
 use crate::punct::Label;
 
 const ENDS: [char; 3] = ['.', '!', '?'];
@@ -44,8 +45,9 @@ enum Tail {
     Spoken(Fit),
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct Joiner {
+    profile: &'static Profile,
     tail: Tail,
     // previous phrase without its closing punctuation, as prompt for the next one
     context: String,
@@ -57,6 +59,17 @@ pub struct Joiner {
 }
 
 impl Joiner {
+    pub fn new(profile: &'static Profile) -> Self {
+        Self {
+            profile,
+            tail: Tail::Start,
+            context: String::new(),
+            typed: String::new(),
+            low: 0,
+            deleted: 0,
+        }
+    }
+
     pub fn prompt(&self) -> &str {
         &self.context
     }
@@ -72,7 +85,7 @@ impl Joiner {
     ) -> Edit {
         self.low = self.typed.len();
         self.deleted = 0;
-        let items = commands::parse(phrase);
+        let items = commands::parse(phrase, self.profile);
         let mut words = self.recent_words();
         let before = words.len();
         words.extend(items.iter().filter_map(|item| match item {
@@ -92,12 +105,14 @@ impl Joiner {
         }
         // the model capitalizes its first word and after its sentence ends, which may not be typed
         let after_end = |i: usize| i == 0 || label(i - 1).is_some_and(|l| l.ends_sentence);
+        let whisper_marks = self.profile.whisper_marks;
         let mut k = before;
         for (i, item) in items.iter().enumerate() {
             match item {
                 Item::Word(word) if bare(word).0.is_empty() => {}
                 Item::Word(word) => {
-                    self.word(word, label(k), after_end(k), i + 1 == items.len());
+                    let l = label(k).filter(|_| !whisper_marks || k == before);
+                    self.word(word, l, after_end(k), i + 1 == items.len());
                     k += 1;
                 }
                 Item::Do(Action::Mark(mark, fit)) => self.mark(mark, *fit),
@@ -176,8 +191,8 @@ impl Joiner {
                 self.typed.push_str(own);
                 Tail::Word
             }
-            (own, None) => Tail::Held(own),
-            (_, Some(label)) => Tail::Held(label.mark),
+            (_, Some(label)) if !self.profile.whisper_marks => Tail::Held(label.mark),
+            (own, _) => Tail::Held(own),
         };
     }
 
@@ -239,7 +254,7 @@ impl Joiner {
 
     /// The next `phrase` as it would be typed now, for the overlay; a delete shows as ⌫.
     pub fn preview(&self, phrase: &str, punct: impl FnOnce(&[String]) -> Vec<Label>) -> String {
-        let deletes = commands::parse(phrase)
+        let deletes = commands::parse(phrase, self.profile)
             .iter()
             .filter(|item| **item == Item::Do(Action::Delete))
             .count();
@@ -279,6 +294,11 @@ fn upper_first(text: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::lang::Language;
+
+    fn joiner() -> Joiner {
+        Joiner::new(Language::Da.profile())
+    }
 
     /// A stand-in for the punctuation model: marks after the words in `marks`, else `end`
     /// after the last word it sees, and capitals for `names`, its first word and after its sentence ends.
@@ -321,13 +341,92 @@ mod tests {
 
     fn typed_with(phrases: &[&str], punct: &impl Fn(&[String]) -> Vec<Label>) -> String {
         let mut doc = String::new();
-        dictate(&mut Joiner::default(), &mut doc, phrases, punct);
+        dictate(&mut joiner(), &mut doc, phrases, punct);
         doc
     }
 
     /// With a model that only ends the text with a full stop.
     fn typed(phrases: &[&str]) -> String {
         typed_with(phrases, &model(&[], Some('.'), NAMES))
+    }
+
+    /// As `typed`, dictating English; the model capitalizes "I" as a name.
+    fn typed_en(phrases: &[&str]) -> String {
+        let mut doc = String::new();
+        let m = model(&[], Some('.'), &["anne", "i"]);
+        dictate(
+            &mut Joiner::new(Language::En.profile()),
+            &mut doc,
+            phrases,
+            &m,
+        );
+        doc
+    }
+
+    #[test]
+    fn keeps_whisper_marks_inside_english_phrases() {
+        let mut doc = String::new();
+        // the model would drop the comma after "York" and lowercase it
+        let m = model(&[("think", '.'), ("walk", ',')], Some('.'), &[]);
+        let phrases = [
+            "It is in New York, I think.",
+            "I went for a walk.",
+            "And then home.",
+            "",
+        ];
+        dictate(
+            &mut Joiner::new(Language::En.profile()),
+            &mut doc,
+            &phrases,
+            &m,
+        );
+        assert_eq!(
+            doc,
+            "It is in New York, I think. I went for a walk, and then home. "
+        );
+    }
+
+    #[test]
+    fn types_spoken_marks_in_english() {
+        let cases = [
+            (
+                "I went home period then I ate comma and slept.",
+                "I went home. Then I ate, and slept. ",
+            ),
+            (
+                "The book open parenthesis which came out this year close parenthesis was a success period",
+                "The book (which came out this year) was a success. ",
+            ),
+            (
+                "It is a black hyphen white film period",
+                "It is a black-white film. ",
+            ),
+            ("He came em dash but too late.", "He came—but too late. "),
+            (
+                "He said open quote I am coming tomorrow close quote period",
+                "He said \"I am coming tomorrow\". ",
+            ),
+            ("Choose yes slash no full stop", "Choose yes/no. "),
+            ("Is it true question mark", "Is it true? "),
+            ("It costs $20 period", "It costs $20. "),
+            ("first point new line", "First point\n"),
+        ];
+        for (heard, want) in cases {
+            assert_eq!(typed_en(&[heard, ""]), want, "{heard}");
+        }
+        assert_eq!(
+            typed_en(&["Dear Anne comma new line thank you for the letter.", ""]),
+            "Dear Anne,\nThank you for the letter. "
+        );
+        assert_eq!(
+            typed_en(&["I have a dog.", "Delete that.", "cat period", ""]),
+            "I have a cat. "
+        );
+        // inside a sentence it is a word
+        assert_eq!(
+            typed_en(&["Please delete the file period", ""]),
+            "Please delete the file. "
+        );
     }
 
     #[test]
@@ -337,7 +436,7 @@ mod tests {
             Some('.'),
             &["rudolf", "steiner"],
         );
-        let mut j = Joiner::default();
+        let mut j = joiner();
         let mut next = |phrase: &str, last: bool| j.next(phrase, last, true, &m).text;
         // a phrase's last mark waits for the next phrase, which ends its guess
         assert_eq!(next("Jeg gik en tur.", false), "Jeg gik en tur");
@@ -358,7 +457,7 @@ mod tests {
     #[test]
     fn keeps_whisper_marks_without_a_model() {
         let none = |_: &[String]| Vec::new();
-        let mut j = Joiner::default();
+        let mut j = joiner();
         let mut next = |phrase: &str, last: bool| j.next(phrase, last, true, none).text;
         assert_eq!(next("Jeg gik, en tur.", false), "Jeg gik, en tur");
         assert_eq!(next("Og Anne kom", true), ". Og Anne kom ");
@@ -367,7 +466,7 @@ mod tests {
     #[test]
     fn prompts_with_the_phrase_before() {
         let none = |_: &[String]| Vec::new();
-        let mut j = Joiner::default();
+        let mut j = joiner();
         j.next("Jeg gik en tur.", false, true, none);
         assert_eq!(j.prompt(), "Jeg gik en tur");
         j.next("", true, true, none);
@@ -525,7 +624,7 @@ mod tests {
     #[test]
     fn deletes_into_the_dictation_before() {
         let m = model(&[], Some('.'), NAMES);
-        let mut j = Joiner::default();
+        let mut j = joiner();
         let mut doc = String::new();
         dictate(&mut j, &mut doc, &["Jeg har en hund.", ""], &m);
         assert_eq!(doc, "Jeg har en hund. ");
@@ -545,7 +644,7 @@ mod tests {
     #[test]
     fn previews_what_will_be_typed() {
         let m = model(&[("kom", ',')], Some('.'), NAMES);
-        let mut j = Joiner::default();
+        let mut j = joiner();
         assert_eq!(j.preview("Hej komma du ny linje", &m), "Hej, du\n");
         assert_eq!(j.preview("slet", &m), "⌫");
         // after earlier phrases: their held mark, and no capital inside the sentence

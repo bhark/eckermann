@@ -5,6 +5,11 @@
   <key>LSUIElement</key>
   <true/>
   <key>NSMicrophoneUsageDescription</key>
-  <string>Eckermann lytter, mens du dikterer, og skriver det, du siger.</string>
+  <string>Eckermann listens while you dictate, and types what you say.</string>
+  <key>CFBundleLocalizations</key>
+  <array>
+    <string>en</string>
+    <string>da</string>
+  </array>
 </dict>
 </plist>

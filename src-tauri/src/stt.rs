@@ -1,4 +1,5 @@
 use crate::audio::RATE;
+use crate::lang::Profile;
 use std::ffi::{c_int, c_void};
 use std::ops::Range;
 use std::path::Path;
@@ -28,7 +29,7 @@ struct Filter {
 
 impl Stt {
     /// `vad` is a Silero VAD model; without it whisper invents text from silence and noise.
-    pub fn load(model: &Path, vad: &Path) -> Result<Self, String> {
+    pub fn load(model: &Path, vad: &Path, profile: &'static Profile) -> Result<Self, String> {
         whisper_rs::install_logging_hooks();
         let mut cp = WhisperContextParameters::default();
         // edda is a turbo fine-tune, and turbo's alignment heads still time its words
@@ -43,8 +44,8 @@ impl Stt {
         let state = ctx.create_state().map_err(|e| e.to_string())?;
         // greedy beat beam search 5 on FLEURS da: 8.1% vs 9.0% WER
         let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
-        params.set_language(Some("da"));
-        params.set_no_timestamps(true);
+        params.set_language(Some(profile.code));
+        params.set_no_timestamps(!profile.timestamps);
         params.set_suppress_nst(true);
         params.set_print_progress(false);
         let pick = |f: &dyn Fn(&[u8]) -> bool| -> Vec<c_int> {
@@ -65,7 +66,7 @@ impl Stt {
         })
     }
 
-    /// 16 kHz mono samples in, Danish text out; empty when nobody spoke.
+    /// 16 kHz mono samples in, text out; empty when nobody spoke.
     /// `prompt` is the text just before this audio, so a phrase continues it.
     pub fn transcribe(&mut self, pcm: &[f32], prompt: &str) -> Result<String, String> {
         self.transcribe_unless(pcm, prompt, &AtomicBool::new(false))

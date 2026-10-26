@@ -1,3 +1,4 @@
+use crate::lang::Language;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
@@ -14,6 +15,8 @@ pub struct Settings {
     pub hotkey: Option<String>,
     /// Microphone as a cpal device id; none follows the system default.
     pub mic: Option<String>,
+    /// The language dictated, by default the system's.
+    pub language: Language,
 }
 
 impl Default for Settings {
@@ -24,6 +27,7 @@ impl Default for Settings {
             pause_ms: 800,
             hotkey: None,
             mic: None,
+            language: crate::ui::language(),
         }
     }
 }
@@ -61,6 +65,7 @@ mod tests {
             pause_ms: 500,
             hotkey: Some("Ctrl+Alt+Space".into()),
             mic: Some("pulseaudio:alsa_input.usb-mic".into()),
+            language: Language::En,
         };
         save(&path, &s).unwrap();
         assert_eq!(load(&path), s);

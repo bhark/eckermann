@@ -5,6 +5,7 @@
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import { flow } from "../flow";
   import { comboFromEvent, keyCaps } from "./combo";
+  import { t } from "./i18n";
   import Picker from "./Picker.svelte";
 
   type Settings = {
@@ -13,6 +14,7 @@
     pause_ms: number;
     hotkey: string | null;
     mic: string | null;
+    language: string;
   };
   type Mic = { id: string; name: string };
   type HotkeyStatus =
@@ -66,23 +68,28 @@
     loaded.then(() => observer.observe(content));
     return () => observer.disconnect();
   });
+  // each language by its own name
+  const LANGUAGES = [
+    { value: "da", label: "Dansk" },
+    { value: "en", label: "English" },
+  ];
   const micOptions = $derived([
-    { value: null, label: "Systemets standard" },
+    { value: null, label: t.systemDefault },
     ...mics.map((m) => ({ value: m.id, label: m.name })),
     ...(settings?.mic && !mics.some((m) => m.id === settings?.mic)
-      ? [{ value: settings.mic, label: "Ikke tilsluttet" }]
+      ? [{ value: settings.mic, label: t.notConnected }]
       : []),
   ]);
 
-  const mb = (bytes: number) => Math.round(bytes / 1e6).toLocaleString("da-DK");
+  const mb = (bytes: number) => Math.round(bytes / 1e6).toLocaleString(t.locale);
 
   // macOS: an event tap takes the key, fn unless another is chosen
   const mac = $derived(status?.kind === "mac");
   const hotkey = $derived(settings?.hotkey ?? (mac ? "Fn" : null));
 
   const ASK = [
-    { what: "microphone", name: "Mikrofon", why: "Så Eckermann kan høre dig." },
-    { what: "accessibility", name: "Tilgængelighed", why: "Så genvejen virker, og teksten bliver skrevet ind." },
+    { what: "microphone", name: t.microphone, why: t.microphoneWhy },
+    { what: "accessibility", name: t.accessibility, why: t.accessibilityWhy },
   ] as const;
   const missing = $derived(!!permissions && !(permissions.microphone && permissions.accessibility));
   // granted in System Settings, so look again until both are there
@@ -168,7 +175,7 @@
 <svelte:window {onkeydown} onfocus={refreshMics} />
 
 <main class="glass" bind:this={main}>
-  <button class="close" onclick={close} aria-label="Luk">
+  <button class="close" onclick={close} aria-label={t.close}>
     <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
   </button>
 
@@ -184,19 +191,19 @@
 
     {#if download?.kind === "running"}
       <div class="download">
-        Henter talemodellerne
+        {t.downloading}
         <span class="hint">
-          {download.total ? `${mb(download.done)} af ${mb(download.total)} MB. ` : ""}Det sker kun første gang.
+          {download.total ? t.downloaded(mb(download.done), mb(download.total)) : ""}{t.onlyOnce}
         </span>
         <progress value={download.done} max={download.total || 1}></progress>
       </div>
     {:else if download?.kind === "failed"}
       <div class="row">
         <span>
-          Talemodellerne kunne ikke hentes
-          <span class="hint">Tjek forbindelsen til internettet, og prøv igen.</span>
+          {t.downloadFailed}
+          <span class="hint">{t.checkConnection}</span>
         </span>
-        <button onclick={() => invoke("download_models")}>Prøv igen</button>
+        <button onclick={() => invoke("download_models")}>{t.retry}</button>
       </div>
     {/if}
 
@@ -208,7 +215,7 @@
               {ask.name}
               <span class="hint">{ask.why}</span>
             </span>
-            <button onclick={() => invoke("grant", { what: ask.what })}>Giv adgang</button>
+            <button onclick={() => invoke("grant", { what: ask.what })}>{t.grant}</button>
           </div>
         {/if}
       {/each}
@@ -217,30 +224,30 @@
     {#if settings}
       <div class="row">
         <span>
-          Genvej
+          {t.hotkey}
           <span class="hint">
             {#if status?.kind === "manual"}
-              Giv denne kommando en genvej i dit skrivebords indstillinger.
+              {t.manualHint}
             {:else if capturing}
-              Bogstaver, tal og mellemrum kræver {mac ? "⌃, ⌥, ⇧ eller ⌘" : "Ctrl, Alt, Shift eller Super"}.
+              {t.needsModifier(mac)}
             {:else}
-              Tryk én gang for at tale og igen for at stoppe.
+              {t.toggleHint}
             {/if}
           </span>
         </span>
         {#if status?.kind !== "manual"}
           <span class="field">
             {#if capturing}
-              <span class="listening">Tryk nu …</span>
-              <button onclick={() => (capturing = false)}>Fortryd</button>
+              <span class="listening">{t.pressNow}</span>
+              <button onclick={() => (capturing = false)}>{t.cancel}</button>
             {:else}
               {#if hotkey}
-                {#each keyCaps(hotkey, mac) as key}<kbd>{key}</kbd>{/each}
+                {#each keyCaps(hotkey, mac, t.keys) as key}<kbd>{key}</kbd>{/each}
               {/if}
               {#if mac && hotkey !== "Fn"}
-                <button onclick={() => setHotkey("Fn")}>Brug fn</button>
+                <button onclick={() => setHotkey("Fn")}>{t.useFn}</button>
               {/if}
-              <button onclick={capture}>{hotkey ? "Skift" : "Vælg"}</button>
+              <button onclick={capture}>{hotkey ? t.change : t.choose}</button>
             {/if}
           </span>
         {/if}
@@ -248,25 +255,30 @@
       {#if status?.kind === "manual"}
         <code>{status.command}</code>
         {#if status.snippet}
-          <p class="hint">For eksempel med F2 i din konfiguration:</p>
+          <p class="hint">{t.snippetHint}</p>
           <code>{status.snippet}</code>
         {/if}
       {:else if status?.kind === "niri" && !status.included}
-        <p class="hint">Tilføj denne linje sidst i din niri-konfiguration:</p>
+        <p class="hint">{t.niriHint}</p>
         <code>{status.include_line}</code>
       {:else if mac && hotkey === "Fn"}
-        <p class="hint">Vælg under Tastatur i Systemindstillinger, at 🌐-tasten ikke skal gøre noget.</p>
+        <p class="hint">{t.fnHint}</p>
       {/if}
 
       <div class="row">
-        <span id="mic-label">Mikrofon</span>
+        <span id="language-label">{t.language}</span>
+        <Picker options={LANGUAGES} bind:value={settings.language} labelledby="language-label" onchange={save} />
+      </div>
+
+      <div class="row">
+        <span id="mic-label">{t.microphone}</span>
         <Picker options={micOptions} bind:value={settings.mic} labelledby="mic-label" onchange={save} />
       </div>
 
       <label class="row">
         <span>
-          Skriv efter en pause på
-          <span class="hint">0: først når du stopper</span>
+          {t.pause}
+          <span class="hint">{t.pauseHint}</span>
         </span>
         <span class="field">
           <input type="number" min="0" max="5000" step="100" bind:value={settings.pause_ms} onchange={save} />
@@ -275,21 +287,21 @@
       </label>
 
       <label class="row">
-        <span>Mellemrum efter hver diktering</span>
+        <span>{t.trailingSpace}</span>
         <input type="checkbox" class="switch" bind:checked={settings.trailing_space} onchange={save} />
       </label>
 
       {#if autostart !== null}
         <label class="row">
-          <span>Start Eckermann ved login</span>
+          <span>{t.autostart}</span>
           <input type="checkbox" class="switch" bind:checked={autostart} onchange={saveAutostart} />
         </label>
       {/if}
 
       <label class="row">
         <span>
-          Frigør hukommelsen efter
-          <span class="hint">Talemodellen indlæses igen, når du taler.</span>
+          {t.unload}
+          <span class="hint">{t.unloadHint}</span>
         </span>
         <span class="field">
           <input type="number" min="1" max="120" bind:value={settings.unload_after_min} onchange={save} />

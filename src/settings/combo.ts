@@ -57,9 +57,7 @@ const CAPS: Record<string, string> = {
   ae: "Æ",
   oslash: "Ø",
   aring: "Å",
-  Space: "Mellemrum",
   Return: "Enter",
-  BackSpace: "Tilbage",
   Page_Up: "Page Up",
   Page_Down: "Page Down",
   Scroll_Lock: "Scroll Lock",
@@ -67,6 +65,6 @@ const CAPS: Record<string, string> = {
 
 const MAC: Record<string, string> = { Ctrl: "⌃", Alt: "⌥", Shift: "⇧", Super: "⌘", Fn: "fn" };
 
-/** Key cap texts for a niri combo, with Apple's modifier signs when `mac`. */
-export const keyCaps = (combo: string, mac = false) =>
-  combo.split("+").map((key) => (mac ? MAC[key] : undefined) ?? CAPS[key] ?? key);
+/** Key cap texts for a niri combo, with Apple's modifier signs when `mac`; `words` names keys in the UI's language. */
+export const keyCaps = (combo: string, mac = false, words: Record<string, string> = {}) =>
+  combo.split("+").map((key) => (mac ? MAC[key] : undefined) ?? words[key] ?? CAPS[key] ?? key);

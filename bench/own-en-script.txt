@@ -1,0 +1,37 @@
+One dictation per line: press the hotkey, read the line, press the hotkey again.
+Speak at a normal pace. "(pause)" means: stay silent for about 1 second.
+The commands are the words in capitals; say them as normal words.
+
+1. I walked over land and sea COMMA there I met an old man PERIOD
+2. I walked over land and sea (pause) COMMA (pause) there I met an old man (pause) PERIOD
+3. What is your name QUESTION MARK
+4. That is fantastic EXCLAMATION MARK NEW LINE thanks for today PERIOD
+5. You need to buy the following COLON milk COMMA bread and butter PERIOD
+6. He came late SEMICOLON she did not come at all PERIOD
+7. We live in a house with an old garden PERIOD NEW PARAGRAPH in summer we eat outside PERIOD
+8. Dear Anne COMMA NEW LINE thank you for the letter PERIOD
+9. First point NEW LINE second point NEW LINE third point
+10. The meeting is tomorrow LINE BREAK remember the coffee
+11. It was a dark and stormy night FULL STOP the wind howled around the house PERIOD
+12. I have a dog (pause) SCRATCH THAT (pause) cat PERIOD
+13. We took the train to Boston on Monday (pause) DELETE THAT (pause) DELETE THAT (pause) last Tuesday PERIOD
+14. I want to delete the file PERIOD
+15. He said OPEN QUOTE I am coming tomorrow CLOSE QUOTE PERIOD
+16. The book OPEN PARENTHESIS which came out this year CLOSE PARENTHESIS was a success PERIOD
+17. My brother OPEN PAREN the oldest CLOSE PAREN lives in Seattle PERIOD
+18. It is a black HYPHEN and HYPHEN white film PERIOD
+19. He came EM DASH but too late PERIOD
+20. It is James APOSTROPHE car PERIOD
+21. Choose yes SLASH no PERIOD
+22. He asked OPEN QUOTE where are you CLOSE QUOTE PERIOD
+23. Today the sun is shining and the birds are singing in the garden
+24. My father is writing a book about his life PERIOD
+25. It was a cold winter day (pause) and the snow fell quietly (pause) over the town PERIOD
+26. I went for a walk COMMA (pause) and then I went home PERIOD
+27. Hi PERIOD NEW PARAGRAPH how are you QUESTION MARK
+28. I am coming soon (pause) PERIOD
+29. Shall we go QUESTION MARK (pause) yes EXCLAMATION POINT
+30. The old man walked slowly home PERIOD (pause) DELETE THAT (pause) home EXCLAMATION MARK
+31. I don't think it's ready yet PERIOD
+32. Then I said that I would come PERIOD
+33. We met Sarah and John in New York PERIOD

@@ -1,12 +1,14 @@
 pub mod audio;
 pub mod commands;
+mod edda;
 mod hotkey;
 pub mod ipc;
+pub mod lang;
 #[cfg(target_os = "linux")]
 mod layer;
 #[cfg(target_os = "macos")]
 mod macos;
-mod models;
+pub mod models;
 mod overlay;
 mod paste;
 mod pipeline;
@@ -14,10 +16,12 @@ pub mod punct;
 mod settings;
 pub mod stt;
 pub mod text;
+mod ui;
 #[cfg(target_os = "linux")]
 mod x11;
 
 use ipc::Command;
+use lang::Language;
 use pipeline::Pipeline;
 use settings::Settings;
 use std::path::PathBuf;
@@ -32,6 +36,7 @@ use tauri::{
 };
 use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_updater::UpdaterExt;
+use ui::{Text, text};
 
 // the app runs for weeks, so it looks again now and then
 const UPDATE_EVERY: Duration = Duration::from_secs(12 * 3600);
@@ -93,7 +98,8 @@ fn run() {
             permissions,
             grant,
             microphones,
-            fit_settings
+            fit_settings,
+            ui_language
         ])
         .setup(|app| {
             let settings_path = app.path().app_config_dir()?.join("settings.json");
@@ -104,6 +110,7 @@ fn run() {
                 // the event tap must return at once
                 std::thread::spawn(move || on_command(&handle, Command::PttToggle));
             });
+            let profile = settings.language.profile();
             let settings = Arc::new(Mutex::new(settings));
             let models = app.path().app_data_dir()?.join("models");
             let overlay = overlay::Overlay::new(app.handle())?;
@@ -113,7 +120,7 @@ fn run() {
                 move |event| overlay.handle(event),
             ));
             // no models yet: a first install, which starts at login from now on
-            let first_run = !models::missing(&models).is_empty();
+            let first_run = !models::missing(&models, profile).is_empty();
             app.manage(AppState {
                 settings,
                 settings_path,
@@ -157,19 +164,18 @@ fn on_command(app: &AppHandle, cmd: Command) {
             let _ = app.run_on_main_thread(move || show_settings(&handle));
         }
         (Command::PttStop, _) => pipeline.stop(),
-        (_, Download::Running { .. }) => pipeline.notice("Talemodellerne hentes stadig."),
-        (_, Download::Failed) => {
-            pipeline.notice("Talemodellerne mangler. Hent dem igen i Indstillinger.")
-        }
+        (_, Download::Running { .. }) => pipeline.notice(text(Text::Downloading)),
+        (_, Download::Failed) => pipeline.notice(text(Text::ModelsMissing)),
         (Command::PttStart, Download::Done) => pipeline.start(),
         (Command::PttToggle, Download::Done) => pipeline.toggle(),
     }
 }
 
-/// Downloads the missing model files, unless a download runs already.
+/// Downloads the model files the chosen language misses, unless a download runs already.
 fn fetch_models(app: &AppHandle) {
     let state = app.state::<AppState>();
-    let files = models::missing(&state.models);
+    let profile = state.settings.lock().unwrap().language.profile();
+    let files = models::missing(&state.models, profile);
     {
         let mut download = state.download.lock().unwrap();
         if matches!(*download, Download::Running { .. }) {
@@ -200,13 +206,17 @@ fn fetch_models(app: &AppHandle) {
             }
         })
         .await;
-        report(match result {
-            Ok(()) => Download::Done,
+        match result {
+            Ok(()) => {
+                report(Download::Done);
+                // the language may have changed while this ran
+                fetch_models(&app);
+            }
             Err(e) => {
                 log::error!("model download: {e}");
-                Download::Failed
+                report(Download::Failed);
             }
-        });
+        }
     });
 }
 
@@ -314,8 +324,8 @@ fn fit_settings(window: WebviewWindow, height: f64) -> tauri::Result<()> {
 }
 
 fn tray(app: &AppHandle) -> tauri::Result<()> {
-    let settings = MenuItem::with_id(app, "settings", "Indstillinger", true, None::<&str>)?;
-    let quit = MenuItem::with_id(app, "quit", "Afslut", true, None::<&str>)?;
+    let settings = MenuItem::with_id(app, "settings", text(Text::Settings), true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", text(Text::Quit), true, None::<&str>)?;
     // the menu bar tints a monochrome template for light and dark mode
     #[cfg(target_os = "macos")]
     let icon = include_bytes!("../icons/tray-template.png");
@@ -341,7 +351,7 @@ fn get_settings(state: State<AppState>) -> Settings {
 }
 
 #[tauri::command]
-fn set_settings(state: State<AppState>, settings: Settings) -> Result<(), String> {
+fn set_settings(app: AppHandle, state: State<AppState>, settings: Settings) -> Result<(), String> {
     let mut current = state.settings.lock().unwrap();
     // only set_hotkey changes the key, since it must bind it too
     let settings = Settings {
@@ -349,7 +359,12 @@ fn set_settings(state: State<AppState>, settings: Settings) -> Result<(), String
         ..settings
     };
     settings::save(&state.settings_path, &settings).map_err(|e| e.to_string())?;
+    let new_language = settings.language != current.language;
     *current = settings;
+    drop(current);
+    if new_language {
+        fetch_models(&app);
+    }
     Ok(())
 }
 
@@ -402,6 +417,11 @@ fn grant(what: String) {
     macos::grant(&what);
     #[cfg(not(target_os = "macos"))]
     let _ = what;
+}
+
+#[tauri::command]
+fn ui_language() -> Language {
+    ui::language()
 }
 
 #[tauri::command]
