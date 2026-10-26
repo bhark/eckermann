@@ -3,7 +3,7 @@
 use objc2_core_foundation::{CFMachPort, CFRetained, CFRunLoop, kCFRunLoopCommonModes};
 use objc2_core_graphics::{
     CGEvent, CGEventField, CGEventFlags, CGEventTapLocation, CGEventTapOptions,
-    CGEventTapPlacement, CGEventTapProxy, CGEventType, CGPreflightPostEventAccess,
+    CGEventTapPlacement, CGEventTapProxy, CGEventType,
 };
 use std::ffi::c_void;
 use std::ptr::NonNull;
@@ -69,22 +69,20 @@ fn listen(on_press: Box<dyn Fn() + Send>) {
     }));
     let port = loop {
         // ponytail: polls until the user grants accessibility in System Settings
-        if CGPreflightPostEventAccess() {
-            let port = unsafe {
-                CGEvent::tap_create(
-                    CGEventTapLocation::SessionEventTap,
-                    CGEventTapPlacement::HeadInsertEventTap,
-                    CGEventTapOptions::Default,
-                    mask,
-                    Some(callback),
-                    tap as *mut Tap as *mut c_void,
-                )
-            };
-            if let Some(port) = port {
-                break port;
-            }
-            log::warn!("hotkey: no event tap yet");
+        let port = unsafe {
+            CGEvent::tap_create(
+                CGEventTapLocation::SessionEventTap,
+                CGEventTapPlacement::HeadInsertEventTap,
+                CGEventTapOptions::Default,
+                mask,
+                Some(callback),
+                tap as *mut Tap as *mut c_void,
+            )
+        };
+        if let Some(port) = port {
+            break port;
         }
+        log::warn!("hotkey: no event tap yet");
         std::thread::sleep(Duration::from_secs(2));
     };
     let Some(source) = CFMachPort::new_run_loop_source(None, Some(&port), 0) else {

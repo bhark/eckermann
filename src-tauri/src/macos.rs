@@ -3,13 +3,18 @@
 use block2::RcBlock;
 use objc2::runtime::Bool;
 use objc2::{class, msg_send};
-use objc2_core_graphics::{CGPreflightPostEventAccess, CGRequestPostEventAccess};
+use objc2_core_graphics::CGRequestPostEventAccess;
 use objc2_foundation::NSString;
 use objc2_service_management::{SMAppService, SMAppServiceStatus};
 
 #[link(name = "AVFoundation", kind = "framework")]
 unsafe extern "C" {
     static AVMediaTypeAudio: &'static NSString;
+}
+
+#[link(name = "ApplicationServices", kind = "framework")]
+unsafe extern "C" {
+    fn AXIsProcessTrusted() -> u8;
 }
 
 // AVAuthorizationStatus
@@ -25,7 +30,7 @@ pub struct Permissions {
 pub fn permissions() -> Permissions {
     Permissions {
         microphone: microphone() == AUTHORIZED,
-        accessibility: CGPreflightPostEventAccess(),
+        accessibility: accessibility(),
     }
 }
 
@@ -34,9 +39,14 @@ pub fn request() {
     if microphone() == NOT_DETERMINED {
         request_microphone();
     }
-    if !CGPreflightPostEventAccess() {
+    if !accessibility() {
         CGRequestPostEventAccess();
     }
+}
+
+// CGPreflightPostEventAccess keeps its first answer for the life of the process
+fn accessibility() -> bool {
+    unsafe { AXIsProcessTrusted() != 0 }
 }
 
 /// Asks for `what`, "microphone" or "accessibility": the dialog if it was never shown, else System Settings.
