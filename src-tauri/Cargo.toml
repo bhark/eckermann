@@ -46,6 +46,11 @@ wayland-protocols-misc = { version = "0.3", features = ["client"] }
 gtk = "0.18"
 gtk-layer-shell = { version = "0.8", features = ["v0_6"] }
 
+[target.'cfg(windows)'.dependencies]
+whisper-rs = { version = "0.16", features = ["vulkan"] }
+tauri-plugin-single-instance = "2.5"
+windows = { version = "0.62", features = ["Win32_System_Registry", "Win32_System_Threading", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_WindowsAndMessaging"] }
+
 [target.'cfg(target_os = "macos")'.dependencies]
 whisper-rs = { version = "0.16", features = ["metal"] }
 block2 = "0.6"

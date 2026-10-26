@@ -31,13 +31,14 @@ test("names letters by their place for macOS", () => {
   expect(comboFromEvent(ev("a", "KeyQ", { metaKey: true }), true)).toBe("Super+Q");
   expect(comboFromEvent(ev("æ", "Semicolon", { altKey: true }), true)).toBe("Alt+ae");
   expect(comboFromEvent(ev(",", "Comma", { ctrlKey: true }), true)).toBeNull();
-  expect(keyCaps("Ctrl+Super+Space", true, da.keys)).toEqual(["⌃", "⌘", "Mellemrum"]);
-  expect(keyCaps("Fn", true)).toEqual(["fn"]);
+  expect(keyCaps("Ctrl+Super+Space", "mac", da.keys)).toEqual(["⌃", "⌘", "Mellemrum"]);
+  expect(keyCaps("Fn", "mac")).toEqual(["fn"]);
 });
 
 test("names key caps in the UI's language", () => {
-  expect(keyCaps("Ctrl+Alt+Space", false, da.keys)).toEqual(["Ctrl", "Alt", "Mellemrum"]);
+  expect(keyCaps("Ctrl+Alt+Space", "linux", da.keys)).toEqual(["Ctrl", "Alt", "Mellemrum"]);
   expect(keyCaps("Ctrl+BackSpace")).toEqual(["Ctrl", "BackSpace"]);
   expect(keyCaps("Super+oslash")).toEqual(["Super", "Ø"]);
   expect(keyCaps("F2")).toEqual(["F2"]);
+  expect(keyCaps("Super+Shift+D", "windows")).toEqual(["Win", "Shift", "D"]);
 });

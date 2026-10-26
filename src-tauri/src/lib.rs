@@ -19,6 +19,8 @@ mod settings;
 pub mod stt;
 pub mod text;
 mod ui;
+#[cfg(windows)]
+mod win;
 #[cfg(target_os = "linux")]
 mod x11;
 
@@ -65,6 +67,7 @@ pub fn main() {
         eprintln!("{e}");
         std::process::exit(2)
     });
+    #[cfg(unix)]
     match ipc::send(cmd.unwrap_or(Command::Show)) {
         Ok(()) => {}
         Err(e) if cmd.is_some() => {
@@ -73,12 +76,28 @@ pub fn main() {
         }
         Err(_) => run(),
     }
+    // the single-instance plugin hands a second launch's command line to the running app
+    #[cfg(windows)]
+    {
+        let _ = cmd;
+        run();
+    }
 }
 
 fn run() {
     // reqwest's rustls comes without a crypto provider; ring, as the updater uses
     let _ = rustls::crypto::ring::default_provider().install_default();
-    let app = tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    // first, so a second launch exits before the other plugins start
+    #[cfg(windows)]
+    let builder =
+        builder.plugin(tauri_plugin_single_instance::init(
+            |app, argv, _| match ipc::from_args(argv.get(1..).unwrap_or_default()) {
+                Ok(cmd) => on_command(app, cmd.unwrap_or(Command::Show)),
+                Err(e) => log::warn!("second launch: {e}"),
+            },
+        ));
+    let app = builder
         .plugin(
             tauri_plugin_log::Builder::default()
                 .level(log::LevelFilter::Info)
@@ -114,7 +133,8 @@ fn run() {
             });
             let profile = settings.language.profile();
             let settings = Arc::new(Mutex::new(settings));
-            let models = app.path().app_data_dir()?.join("models");
+            // local, as a roaming profile would sync the models on windows
+            let models = app.path().app_local_data_dir()?.join("models");
             let overlay = overlay::Overlay::new(app.handle())?;
             app.manage(Pipeline::new(
                 models.clone(),
@@ -138,8 +158,11 @@ fn run() {
                 fetch_models(app.handle());
                 show_settings(app.handle());
             }
-            let handle = app.handle().clone();
-            ipc::listen(move |cmd| on_command(&handle, cmd))?;
+            #[cfg(unix)]
+            {
+                let handle = app.handle().clone();
+                ipc::listen(move |cmd| on_command(&handle, cmd))?;
+            }
             tray(app.handle())?;
             keep_updated(app.handle().clone());
             Ok(())
@@ -407,7 +430,13 @@ fn permissions() -> Option<macos::Permissions> {
     Some(macos::permissions())
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(windows)]
+#[tauri::command]
+fn permissions() -> Option<win::Permissions> {
+    Some(win::permissions())
+}
+
+#[cfg(target_os = "linux")]
 #[tauri::command]
 fn permissions() -> Option<()> {
     None
@@ -417,7 +446,9 @@ fn permissions() -> Option<()> {
 fn grant(what: String) {
     #[cfg(target_os = "macos")]
     macos::grant(&what);
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(windows)]
+    win::grant(&what);
+    #[cfg(target_os = "linux")]
     let _ = what;
 }
 

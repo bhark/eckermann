@@ -29,7 +29,7 @@ type Keys = Pick<KeyboardEvent, "key" | "code" | "ctrlKey" | "altKey" | "shiftKe
 
 /**
  * Combo in niri syntax, e.g. "Ctrl+Alt+Space"; null while only modifiers are down or for unsupported keys.
- * `physical` names letters by their place on the keyboard, as macOS matches key codes.
+ * `physical` names letters by their place on the keyboard, as macOS and Windows match key codes.
  */
 export function comboFromEvent(e: Keys, physical = false): string | null {
   const key = keyName(e, physical);
@@ -63,8 +63,14 @@ const CAPS: Record<string, string> = {
   Scroll_Lock: "Scroll Lock",
 };
 
-const MAC: Record<string, string> = { Ctrl: "⌃", Alt: "⌥", Shift: "⇧", Super: "⌘", Fn: "fn" };
+export type Platform = "mac" | "windows" | "linux";
 
-/** Key cap texts for a niri combo, with Apple's modifier signs when `mac`; `words` names keys in the UI's language. */
-export const keyCaps = (combo: string, mac = false, words: Record<string, string> = {}) =>
-  combo.split("+").map((key) => (mac ? MAC[key] : undefined) ?? words[key] ?? CAPS[key] ?? key);
+const NAMES: Record<Platform, Record<string, string>> = {
+  mac: { Ctrl: "⌃", Alt: "⌥", Shift: "⇧", Super: "⌘", Fn: "fn" },
+  windows: { Super: "Win" },
+  linux: {},
+};
+
+/** Key cap texts for a niri combo, with the platform's modifier names; `words` names keys in the UI's language. */
+export const keyCaps = (combo: string, platform: Platform = "linux", words: Record<string, string> = {}) =>
+  combo.split("+").map((key) => NAMES[platform][key] ?? words[key] ?? CAPS[key] ?? key);

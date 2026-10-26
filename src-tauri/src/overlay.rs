@@ -60,7 +60,7 @@ impl Overlay {
         let usable = true;
         if usable && !layered {
             // on the bottom edge of the work area, so above a dock; gtk got its input region in layer::overlay
-            #[cfg(target_os = "macos")]
+            #[cfg(not(target_os = "linux"))]
             window.set_ignore_cursor_events(true)?;
             if let Some(monitor) = window.primary_monitor()? {
                 let area = monitor.work_area();
@@ -126,6 +126,9 @@ impl Overlay {
         }
         shown.visible = wanted;
         if wanted && let Some(window) = self.app.get_webview_window(LABEL) {
+            #[cfg(windows)]
+            crate::win::show_inactive(&window);
+            #[cfg(not(windows))]
             let _ = window.show();
         }
         let _ = self.app.emit_to(LABEL, "shown", wanted);
@@ -138,6 +141,9 @@ impl Overlay {
         if !shown.visible
             && let Some(window) = self.app.get_webview_window(LABEL)
         {
+            #[cfg(windows)]
+            crate::win::hide(&window);
+            #[cfg(not(windows))]
             let _ = window.hide();
         }
     }

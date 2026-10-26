@@ -43,9 +43,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-15]
+        os: [ubuntu-24.04, macos-15, windows-2025]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -66,6 +69,16 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev \
             libgtk-layer-shell-dev libasound2-dev libvulkan-dev glslc patchelf
+      - if: runner.os == 'Windows'
+        uses: jakoch/install-vulkan-sdk-action@d17de7e2f5e50efb5d2123efed18497d3c58c533 # v1.7.0
+        with:
+          vulkan_version: 1.4.363.0
+          install_runtime: true
+      # a pc without a vulkan driver has no loader, and the app would not start
+      - if: runner.os == 'Windows'
+        run: |
+          mkdir -p src-tauri/target/vulkan
+          cp "$(cygpath -u "$VULKAN_SDK")/runtime/x64/vulkan-1.dll" src-tauri/target/vulkan/
       # self-signed, so macOS keeps the microphone and accessibility grants across updates
       - if: runner.os == 'macOS'
         env:
@@ -105,6 +118,7 @@ jobs:
             src-tauri/target/release/bundle/appimage/*.AppImage
             src-tauri/target/release/bundle/deb/*.deb
             src-tauri/target/release/bundle/rpm/*.rpm
+            src-tauri/target/release/bundle/nsis/*.exe
 
   checksums:
     needs: build
@@ -117,6 +131,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
         run: |
-          gh release download "$TAG" -R "$GITHUB_REPOSITORY" -D out -p '*.dmg' -p '*.AppImage' -p '*.deb' -p '*.rpm'
+          gh release download "$TAG" -R "$GITHUB_REPOSITORY" -D out -p '*.dmg' -p '*.AppImage' -p '*.deb' -p '*.rpm' -p '*.exe'
           (cd out && sha256sum -- *) > SHA256SUMS
           gh release upload "$TAG" -R "$GITHUB_REPOSITORY" SHA256SUMS --clobber

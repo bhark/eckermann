@@ -1,4 +1,11 @@
+import { type Platform, keyCaps } from "./combo";
+
 // the settings page's words; Rust's are in src-tauri/src/ui.rs
+const either = (platform: Platform, or: string) => {
+  const keys = keyCaps("Ctrl+Alt+Shift+Super", platform);
+  return `${keys.slice(0, -1).join(", ")} ${or} ${keys.at(-1)}`;
+};
+
 export const da = {
   locale: "da-DK",
   close: "Luk",
@@ -16,8 +23,7 @@ export const da = {
   grant: "Giv adgang",
   hotkey: "Genvej",
   manualHint: "Giv denne kommando en genvej i dit skrivebords indstillinger.",
-  needsModifier: (mac: boolean) =>
-    `Bogstaver, tal og mellemrum kræver ${mac ? "⌃, ⌥, ⇧ eller ⌘" : "Ctrl, Alt, Shift eller Super"}.`,
+  needsModifier: (platform: Platform) => `Bogstaver, tal og mellemrum kræver ${either(platform, "eller")}.`,
   toggleHint: "Tryk én gang for at tale og igen for at stoppe.",
   pressNow: "Tryk nu …",
   cancel: "Fortryd",
@@ -55,7 +61,7 @@ const en: typeof da = {
   grant: "Allow",
   hotkey: "Shortcut",
   manualHint: "Give this command a shortcut in your desktop's settings.",
-  needsModifier: (mac) => `Letters, digits and space need ${mac ? "⌃, ⌥, ⇧ or ⌘" : "Ctrl, Alt, Shift or Super"}.`,
+  needsModifier: (platform) => `Letters, digits and space need ${either(platform, "or")}.`,
   toggleHint: "Press once to talk and again to stop.",
   pressNow: "Press now …",
   cancel: "Cancel",

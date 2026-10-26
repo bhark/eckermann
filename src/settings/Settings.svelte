@@ -4,7 +4,7 @@
   import { listen } from "@tauri-apps/api/event";
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import { flow } from "../flow";
-  import { comboFromEvent, keyCaps } from "./combo";
+  import { comboFromEvent, keyCaps, type Platform } from "./combo";
   import { t } from "./i18n";
   import Picker from "./Picker.svelte";
 
@@ -22,7 +22,8 @@
     | { kind: "manual"; command: string; snippet: string | null }
     | { kind: "x11" }
     | { kind: "portal" }
-    | { kind: "mac" };
+    | { kind: "mac" }
+    | { kind: "windows" };
   type Permissions = { microphone: boolean; accessibility: boolean };
   type Download =
     | { kind: "running"; done: number; total: number }
@@ -84,8 +85,9 @@
 
   const mb = (bytes: number) => Math.round(bytes / 1e6).toLocaleString(t.locale);
 
+  const platform = $derived<Platform>(status?.kind === "mac" || status?.kind === "windows" ? status.kind : "linux");
   // macOS: an event tap takes the key, fn unless another is chosen
-  const mac = $derived(status?.kind === "mac");
+  const mac = $derived(platform === "mac");
   const hotkey = $derived(settings?.hotkey ?? (mac ? "Fn" : null));
 
   const ASK = [
@@ -155,7 +157,7 @@
       capturing = false;
       return;
     }
-    const combo = comboFromEvent(e, mac);
+    const combo = comboFromEvent(e, platform !== "linux");
     if (!combo) return;
     capturing = false;
     await setHotkey(combo);
@@ -230,7 +232,7 @@
             {#if status?.kind === "manual"}
               {t.manualHint}
             {:else if capturing}
-              {t.needsModifier(mac)}
+              {t.needsModifier(platform)}
             {:else}
               {t.toggleHint}
             {/if}
@@ -243,7 +245,7 @@
               <button onclick={() => (capturing = false)}>{t.cancel}</button>
             {:else}
               {#if hotkey}
-                {#each keyCaps(hotkey, mac, t.keys) as key}<kbd>{key}</kbd>{/each}
+                {#each keyCaps(hotkey, platform, t.keys) as key}<kbd>{key}</kbd>{/each}
               {/if}
               {#if mac && hotkey !== "Fn"}
                 <button onclick={() => setHotkey("Fn")}>{t.useFn}</button>

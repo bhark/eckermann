@@ -1,9 +1,10 @@
 //! What the dictation key runs: `eckermann --ptt ...` without loading webkit and gtk.
 
-use eckermann_lib::ipc;
-use std::process::exit;
-
+#[cfg(unix)]
 fn main() {
+    use eckermann_lib::ipc;
+    use std::process::exit;
+
     let args: Vec<String> = std::env::args().skip(1).collect();
     let cmd = match ipc::from_args(&args) {
         Ok(Some(cmd)) => cmd,
@@ -21,3 +22,7 @@ fn main() {
         exit(1)
     }
 }
+
+// ponytail: windows binds the key inside the app, so this stays empty there; a cargo feature would drop it from the installer
+#[cfg(not(unix))]
+fn main() {}

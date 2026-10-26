@@ -1,11 +1,15 @@
 //! Local control socket: compositor binds run `eckermann --ptt start|stop|toggle`,
 //! and a second plain launch asks the running instance to show its settings.
+//! Windows has no socket; the single-instance plugin hands over the command line instead.
 
-use std::fs::Permissions;
-use std::io::{BufRead, BufReader, Write};
-use std::os::unix::fs::PermissionsExt;
-use std::os::unix::net::{UnixListener, UnixStream};
-use std::path::PathBuf;
+#[cfg(unix)]
+use std::{
+    fs::Permissions,
+    io::{BufRead, BufReader, Write},
+    os::unix::fs::PermissionsExt,
+    os::unix::net::{UnixListener, UnixStream},
+    path::PathBuf,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Command {
@@ -23,6 +27,7 @@ const NAMES: [(Command, &str); 4] = [
 ];
 
 impl Command {
+    #[cfg(any(unix, test))]
     fn name(self) -> &'static str {
         NAMES
             .iter()
@@ -50,6 +55,7 @@ pub fn from_args(args: &[String]) -> Result<Option<Command>, String> {
     }
 }
 
+#[cfg(unix)]
 fn socket_path() -> PathBuf {
     // per-user dirs: XDG_RUNTIME_DIR on Linux (0700), TMPDIR on macOS
     std::env::var_os("XDG_RUNTIME_DIR")
@@ -59,12 +65,14 @@ fn socket_path() -> PathBuf {
 }
 
 /// Hand a command to the running instance; fails if none is running.
+#[cfg(unix)]
 pub fn send(cmd: Command) -> std::io::Result<()> {
     let mut stream = UnixStream::connect(socket_path())?;
     writeln!(stream, "{}", cmd.name())
 }
 
 /// Serve commands until the process exits. Call only after `send` failed.
+#[cfg(unix)]
 pub fn listen(handler: impl Fn(Command) + Send + 'static) -> std::io::Result<()> {
     let path = socket_path();
     // ponytail: two launches in the same instant can both get here; the later one wins the socket

@@ -1,14 +1,18 @@
 //! Global dictation key: a niri bind, an X11 key grab or the GNOME/KDE portal on Linux, an event
-//! tap on macOS. Other desktops get the command to bind in their own settings.
+//! tap on macOS, a registered hotkey on Windows. Other desktops get the command to bind in their own settings.
 
 #[cfg(target_os = "macos")]
 mod mac;
 #[cfg(target_os = "linux")]
 mod niri;
+#[cfg(windows)]
+mod win;
 
 #[cfg(target_os = "macos")]
 pub use mac::{apply, start};
 use serde::Serialize;
+#[cfg(windows)]
+pub use win::{apply, start};
 
 #[derive(Serialize)]
 #[serde(tag = "kind", rename_all = "lowercase")]
@@ -29,11 +33,18 @@ pub enum Status {
     },
     #[cfg(target_os = "macos")]
     Mac,
+    #[cfg(windows)]
+    Windows,
 }
 
 #[cfg(target_os = "macos")]
 pub fn status() -> Status {
     Status::Mac
+}
+
+#[cfg(windows)]
+pub fn status() -> Status {
+    Status::Windows
 }
 
 #[cfg(target_os = "linux")]

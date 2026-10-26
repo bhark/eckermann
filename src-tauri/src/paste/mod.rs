@@ -5,8 +5,12 @@
 mod macos;
 #[cfg(target_os = "linux")]
 mod wayland;
+#[cfg(windows)]
+mod win;
 #[cfg(target_os = "macos")]
 use macos::Keys;
+#[cfg(windows)]
+use win::Keys;
 
 /// The Wayland virtual keyboard, else the GNOME/KDE portal; XTest in an X11 session.
 #[cfg(target_os = "linux")]
@@ -53,29 +57,6 @@ impl Keys {
             Self::X11(keys) => keys.backspace(),
             Self::Portal(keys) => keys.backspace(),
         }
-    }
-}
-
-// ponytail: no key sender elsewhere, so text stays on the clipboard
-#[cfg(not(any(target_os = "linux", target_os = "macos")))]
-enum Keys {}
-
-#[cfg(not(any(target_os = "linux", target_os = "macos")))]
-impl Keys {
-    fn new() -> Result<Self, String> {
-        Err("no key sender on this platform".into())
-    }
-
-    fn paste(&mut self) -> Result<(), String> {
-        match *self {}
-    }
-
-    fn enter(&mut self) -> Result<(), String> {
-        match *self {}
-    }
-
-    fn backspace(&mut self) -> Result<(), String> {
-        match *self {}
     }
 }
 
