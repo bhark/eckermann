@@ -1,6 +1,6 @@
 [package]
 name = "eckermann"
-version = "0.1.0"
+version = "0.1.1"
 description = "Local dictation into any app"
 license = "GPL-3.0-only"
 edition = "2024"
