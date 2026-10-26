@@ -34,12 +34,13 @@ jobs:
         with:
           toolchain: stable
           components: clippy, rustfmt
-      # msbuild fails on paths over 260 chars; set before rust-cache so it caches this dir
+      # msbuild fails on paths over 260 chars, which whisper's vulkan build passes under src-tauri/target
       - if: runner.os == 'Windows'
-        run: echo "CARGO_TARGET_DIR=C:/t" >> "$GITHUB_ENV"
+        run: echo "CARGO_TARGET_DIR=D:/a/t" >> "$GITHUB_ENV"
+      # rust-cache ignores CARGO_TARGET_DIR and joins this to the workspace, so the same dir as a relative path
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
-          workspaces: src-tauri
+          workspaces: ${{ runner.os == 'Windows' && 'src-tauri -> ../../../t' || 'src-tauri' }}
       # a stalled ubuntu mirror otherwise hangs the job; this step normally takes under a minute
       - if: runner.os == 'Linux'
         timeout-minutes: 5
