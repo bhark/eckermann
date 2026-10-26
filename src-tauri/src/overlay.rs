@@ -41,6 +41,7 @@ impl Overlay {
             .shadow(false)
             .resizable(false)
             .always_on_top(true)
+            .visible_on_all_workspaces(true)
             .skip_taskbar(true)
             .focused(false)
             .focusable(false)
@@ -48,6 +49,20 @@ impl Overlay {
             .build()?;
         #[cfg(target_os = "linux")]
         crate::layer::overlay(&window.gtk_window()?, WIDTH, HEIGHT);
+        #[cfg(target_os = "macos")]
+        {
+            // no layer-shell: click-through, and on the screen's bottom edge above the dock
+            window.set_ignore_cursor_events(true)?;
+            if let Some(monitor) = window.primary_monitor()? {
+                let area = monitor.work_area();
+                let size = tauri::LogicalSize::new(WIDTH, HEIGHT)
+                    .to_physical::<i32>(monitor.scale_factor());
+                window.set_position(tauri::PhysicalPosition::new(
+                    area.position.x + (area.size.width as i32 - size.width) / 2,
+                    area.position.y + area.size.height as i32 - size.height,
+                ))?;
+            }
+        }
         let overlay = Arc::new(Self {
             app: app.clone(),
             shown: Mutex::new(Shown::default()),

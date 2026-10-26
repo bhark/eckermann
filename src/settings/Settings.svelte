@@ -14,7 +14,9 @@
   };
   type HotkeyStatus =
     | { kind: "niri"; included: boolean; include_line: string }
-    | { kind: "manual"; command: string };
+    | { kind: "manual"; command: string }
+    | { kind: "native" };
+  type Permissions = { microphone: boolean; accessibility: boolean };
   type Download =
     | { kind: "running"; done: number; total: number }
     | { kind: "failed" }
@@ -24,6 +26,7 @@
   let status = $state<HotkeyStatus | null>(null);
   let download = $state<Download | null>(null);
   let autostart = $state<boolean | null>(null);
+  let permissions = $state<Permissions | null>(null);
   let capturing = $state(false);
   let error = $state("");
   let version = $state("");
@@ -37,6 +40,24 @@
   invoke<boolean>("autostart").then((on) => (autostart = on));
 
   const mb = (bytes: number) => Math.round(bytes / 1e6).toLocaleString("da-DK");
+
+  // macOS: an event tap takes the key, fn unless another is chosen
+  const native = $derived(status?.kind === "native");
+  const hotkey = $derived(settings?.hotkey ?? (native ? "Fn" : null));
+
+  const ASK = [
+    { what: "microphone", name: "Mikrofon", why: "Så Eckermann kan høre dig." },
+    { what: "accessibility", name: "Tilgængelighed", why: "Så genvejen virker, og teksten bliver skrevet ind." },
+  ] as const;
+  const refreshPermissions = () => invoke<Permissions | null>("permissions").then((p) => (permissions = p));
+  const missing = $derived(!!permissions && !(permissions.microphone && permissions.accessibility));
+  refreshPermissions();
+  // granted in System Settings, so look again until both are there
+  $effect(() => {
+    if (!missing) return;
+    const timer = setInterval(refreshPermissions, 2000);
+    return () => clearInterval(timer);
+  });
 
   $effect(() => {
     const frame = flow(canvas);
@@ -93,9 +114,14 @@
       capturing = false;
       return;
     }
-    const combo = comboFromEvent(e);
+    const combo = comboFromEvent(e, native);
     if (!combo) return;
     capturing = false;
+    await setHotkey(combo);
+  }
+
+  async function setHotkey(combo: string) {
+    if (!settings) return;
     try {
       await invoke("set_hotkey", { combo });
       settings.hotkey = combo;
@@ -139,6 +165,20 @@
     </div>
   {/if}
 
+  {#if permissions}
+    {#each ASK as ask}
+      {#if !permissions[ask.what]}
+        <div class="row">
+          <span>
+            {ask.name}
+            <span class="hint">{ask.why}</span>
+          </span>
+          <button onclick={() => invoke("grant", { what: ask.what })}>Giv adgang</button>
+        </div>
+      {/if}
+    {/each}
+  {/if}
+
   {#if settings}
     <div class="row">
       <span>
@@ -147,7 +187,7 @@
           {#if status?.kind === "manual"}
             Giv denne kommando en genvej i dit skrivebords indstillinger.
           {:else if capturing}
-            Bogstaver, tal og mellemrum kræver Ctrl, Alt, Shift eller Super.
+            Bogstaver, tal og mellemrum kræver {native ? "⌃, ⌥, ⇧ eller ⌘" : "Ctrl, Alt, Shift eller Super"}.
           {:else}
             Tryk én gang for at tale og igen for at stoppe.
           {/if}
@@ -159,10 +199,13 @@
             <span class="listening">Tryk nu …</span>
             <button onclick={() => (capturing = false)}>Fortryd</button>
           {:else}
-            {#if settings.hotkey}
-              {#each keyCaps(settings.hotkey) as key}<kbd>{key}</kbd>{/each}
+            {#if hotkey}
+              {#each keyCaps(hotkey, native) as key}<kbd>{key}</kbd>{/each}
             {/if}
-            <button onclick={capture}>{settings.hotkey ? "Skift" : "Vælg"}</button>
+            {#if native && hotkey !== "Fn"}
+              <button onclick={() => setHotkey("Fn")}>Brug fn</button>
+            {/if}
+            <button onclick={capture}>{hotkey ? "Skift" : "Vælg"}</button>
           {/if}
         </span>
       {/if}
@@ -172,6 +215,8 @@
     {:else if status?.kind === "niri" && !status.included}
       <p class="hint">Tilføj denne linje sidst i din niri-konfiguration:</p>
       <code>{status.include_line}</code>
+    {:else if native && hotkey === "Fn"}
+      <p class="hint">Vælg under Tastatur i Systemindstillinger, at 🌐-tasten ikke skal gøre noget.</p>
     {/if}
 
     <label class="row">

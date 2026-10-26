@@ -5,12 +5,16 @@
 mod linux;
 #[cfg(target_os = "linux")]
 use linux::Keys;
+#[cfg(target_os = "macos")]
+mod macos;
+#[cfg(target_os = "macos")]
+use macos::Keys;
 
-// ponytail: no key sender off linux yet, so text stays on the clipboard; macOS needs Cmd+V, Return, Backspace
-#[cfg(not(target_os = "linux"))]
+// ponytail: no key sender elsewhere, so text stays on the clipboard
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
 enum Keys {}
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
 impl Keys {
     fn new() -> Result<Self, String> {
         Err("no key sender on this platform".into())
@@ -44,14 +48,26 @@ pub struct Paster {
 impl Paster {
     pub fn new() -> Result<Self, String> {
         let clipboard = arboard::Clipboard::new().map_err(|e| e.to_string())?;
-        let keys = Keys::new()
-            .inspect_err(|e| log::warn!("cannot send the paste shortcut: {e}"))
-            .ok();
-        Ok(Self { clipboard, keys })
+        let mut paster = Self {
+            clipboard,
+            keys: None,
+        };
+        paster.find_keys();
+        Ok(paster)
+    }
+
+    // tried again before each edit: on macOS the permission may come while the app runs
+    fn find_keys(&mut self) {
+        if self.keys.is_none() {
+            self.keys = Keys::new()
+                .inspect_err(|e| log::warn!("cannot send the paste shortcut: {e}"))
+                .ok();
+        }
     }
 
     /// Returns false when the text is only on the clipboard and the user must paste it.
     pub fn apply(&mut self, edit: &Edit) -> Result<bool, String> {
+        self.find_keys();
         if edit.delete > 0 {
             let Some(keys) = &mut self.keys else {
                 return Ok(false);

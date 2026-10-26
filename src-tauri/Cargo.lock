@@ -1219,6 +1219,7 @@ name = "eckermann"
 version = "0.1.0"
 dependencies = [
  "arboard",
+ "block2",
  "candle-core",
  "candle-nn",
  "candle-transformers",
@@ -1228,6 +1229,10 @@ dependencies = [
  "hound",
  "libc",
  "log",
+ "objc2",
+ "objc2-core-foundation",
+ "objc2-core-graphics",
+ "objc2-foundation",
  "reqwest",
  "rubato",
  "rustls",

@@ -32,6 +32,13 @@ pub fn status() -> Status {
     }
 }
 
+/// Binds the saved key again with this executable's path; niri runs the sender, not `_on_press`.
+pub fn start(combo: Option<&str>, _on_press: impl Fn() + Send + 'static) {
+    if let Some(Err(e)) = combo.map(apply) {
+        log::error!("hotkey: {e}");
+    }
+}
+
 /// Binds `combo` (niri key syntax, e.g. "Ctrl+Alt+Space") to start and stop dictation.
 pub fn apply(combo: &str) -> Result<(), String> {
     // goes into the KDL file unquoted

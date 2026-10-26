@@ -4,6 +4,8 @@ mod hotkey;
 pub mod ipc;
 #[cfg(target_os = "linux")]
 mod layer;
+#[cfg(target_os = "macos")]
+mod macos;
 mod models;
 mod overlay;
 mod paste;
@@ -22,7 +24,6 @@ use std::time::Duration;
 use tauri::image::Image;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
-use tauri::utils::config::BundleType;
 use tauri::{AppHandle, Emitter, Manager, RunEvent, State, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_updater::UpdaterExt;
@@ -83,15 +84,19 @@ fn run() {
             download_status,
             download_models,
             autostart,
-            set_autostart
+            set_autostart,
+            permissions,
+            grant
         ])
         .setup(|app| {
             let settings_path = app.path().app_config_dir()?.join("settings.json");
             let settings = settings::load(&settings_path);
-            // rewrites the bind with this executable's path
-            if let Some(Err(e)) = settings.hotkey.as_deref().map(hotkey::apply) {
-                log::error!("hotkey: {e}");
-            }
+            let handle = app.handle().clone();
+            hotkey::start(settings.hotkey.as_deref(), move || {
+                let handle = handle.clone();
+                // the event tap must return at once
+                std::thread::spawn(move || on_command(&handle, Command::PttToggle));
+            });
             let settings = Arc::new(Mutex::new(settings));
             let models = app.path().app_data_dir()?.join("models");
             let overlay = overlay::Overlay::new(app.handle())?;
@@ -112,6 +117,8 @@ fn run() {
                 if let Err(e) = app.autolaunch().enable() {
                     log::error!("autostart: {e}");
                 }
+                #[cfg(target_os = "macos")]
+                macos::request();
                 fetch_models(app.handle());
                 show_settings(app.handle());
             }
@@ -200,7 +207,8 @@ fn fetch_models(app: &AppHandle) {
 fn keep_updated(app: AppHandle) {
     // the bundler also patches target/release, and the updater would replace that binary with the AppImage
     let installed = match tauri::utils::platform::bundle_type() {
-        Some(BundleType::AppImage) => app.env().appimage.is_some(),
+        #[cfg(target_os = "linux")]
+        Some(tauri::utils::config::BundleType::AppImage) => app.env().appimage.is_some(),
         bundle => bundle.is_some(),
     };
     if !installed {
@@ -250,6 +258,7 @@ fn show_settings(app: &AppHandle) {
         .transparent(true)
         .shadow(false)
         .resizable(false)
+        .center()
         .visible(false)
         .build();
     let window = match built {
@@ -267,8 +276,14 @@ fn show_settings(app: &AppHandle) {
 fn tray(app: &AppHandle) -> tauri::Result<()> {
     let settings = MenuItem::with_id(app, "settings", "Indstillinger", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Afslut", true, None::<&str>)?;
+    // the menu bar tints a monochrome template for light and dark mode
+    #[cfg(target_os = "macos")]
+    let icon = include_bytes!("../icons/tray-template.png");
+    #[cfg(not(target_os = "macos"))]
+    let icon = include_bytes!("../icons/tray.png");
     TrayIconBuilder::new()
-        .icon(Image::from_bytes(include_bytes!("../icons/tray.png"))?)
+        .icon(Image::from_bytes(icon)?)
+        .icon_as_template(cfg!(target_os = "macos"))
         .tooltip("Eckermann")
         .menu(&Menu::with_items(app, &[&settings, &quit])?)
         .on_menu_event(|app, event| match event.id().as_ref() {
@@ -321,6 +336,26 @@ fn set_autostart(app: AppHandle, on: bool) -> Result<(), String> {
         false => launch.disable(),
     }
     .map_err(|e| e.to_string())
+}
+
+#[cfg(target_os = "macos")]
+#[tauri::command]
+fn permissions() -> Option<macos::Permissions> {
+    Some(macos::permissions())
+}
+
+#[cfg(not(target_os = "macos"))]
+#[tauri::command]
+fn permissions() -> Option<()> {
+    None
+}
+
+#[tauri::command]
+fn grant(what: String) {
+    #[cfg(target_os = "macos")]
+    macos::grant(&what);
+    #[cfg(not(target_os = "macos"))]
+    let _ = what;
 }
 
 #[tauri::command]

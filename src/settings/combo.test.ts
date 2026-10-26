@@ -26,6 +26,14 @@ test("rejects keys that would block typing or that niri cannot name", () => {
   expect(comboFromEvent(ev(",", "Comma", { ctrlKey: true }))).toBeNull();
 });
 
+test("names letters by their place for macOS", () => {
+  expect(comboFromEvent(ev("a", "KeyQ", { metaKey: true }), true)).toBe("Super+Q");
+  expect(comboFromEvent(ev("æ", "Semicolon", { altKey: true }), true)).toBe("Alt+ae");
+  expect(comboFromEvent(ev(",", "Comma", { ctrlKey: true }), true)).toBeNull();
+  expect(keyCaps("Ctrl+Super+Space", true)).toEqual(["⌃", "⌘", "Mellemrum"]);
+  expect(keyCaps("Fn", true)).toEqual(["fn"]);
+});
+
 test("names key caps in Danish", () => {
   expect(keyCaps("Ctrl+Alt+Space")).toEqual(["Ctrl", "Alt", "Mellemrum"]);
   expect(keyCaps("Super+oslash")).toEqual(["Super", "Ø"]);
