@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  # also takes installer screenshots for review
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -53,7 +55,7 @@ jobs:
         run: |
           mkdir -p src-tauri/target/vulkan
           cp "$(cygpath -u "$VULKAN_SDK")/runtime/x64/vulkan-1.dll" src-tauri/target/vulkan/
-          echo "$VULKAN_SDK\runtime\x64" >> "$GITHUB_PATH"
+          cygpath -w "$VULKAN_SDK/runtime/x64" >> "$GITHUB_PATH"
       - run: bun install --frozen-lockfile
       - run: bun run check
       - run: bun test ./src
@@ -64,11 +66,13 @@ jobs:
           cargo fmt --check
           cargo clippy --release --all-targets -- -D warnings
           cargo test --release
+      # through tauri's bundler, so a cli bump that breaks the forked installer template fails here
+      - if: runner.os == 'Windows'
+        run: bun run tauri build --config '{"bundle":{"createUpdaterArtifacts":false}}'
       # started offline, so a missing dll or an early panic fails here and no models download
       - if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          bun run tauri build --no-bundle
           $exe = (Resolve-Path src-tauri/target/release/eckermann.exe).Path
           New-NetFirewallRule -DisplayName eckermann-smoke -Direction Outbound -Program $exe -Action Block | Out-Null
           $app = Start-Process $exe -PassThru
@@ -76,3 +80,30 @@ jobs:
           Get-Content "$env:LOCALAPPDATA/dk.forn.eckermann/logs/Eckermann.log" -ErrorAction SilentlyContinue
           if ($app.HasExited) { throw "eckermann exited with code $($app.ExitCode)" }
           Stop-Process -Id $app.Id
+      - if: github.event_name == 'workflow_dispatch' && runner.os == 'Windows'
+        shell: pwsh
+        run: src-tauri/installer/windows/shots.ps1
+      # both dmg looks, in light and dark appearance
+      - if: github.event_name == 'workflow_dispatch' && runner.os == 'macOS'
+        working-directory: src-tauri
+        run: |
+          bun run tauri build --bundles app --config '{"bundle":{"createUpdaterArtifacts":false}}'
+          mkdir -p ../shots
+          for look in dark light; do
+            installer/dmg.sh target/release/bundle/macos/Eckermann.app "target/$look.dmg" "$look"
+            hdiutil attach -nobrowse "target/$look.dmg"
+            for appearance in light dark; do
+              if [ $appearance = dark ]; then defaults write -g AppleInterfaceStyle Dark; else defaults delete -g AppleInterfaceStyle || true; fi
+              killall Finder || true
+              sleep 3
+              open /Volumes/Eckermann
+              sleep 3
+              screencapture -x "../shots/dmg-$look-in-$appearance.png"
+            done
+            hdiutil detach /Volumes/Eckermann
+          done
+      - if: github.event_name == 'workflow_dispatch' && runner.os != 'Linux'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: shots-${{ runner.os }}
+          path: shots

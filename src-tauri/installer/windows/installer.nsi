@@ -779,6 +779,11 @@ Function un.onInit
   ${IfNot} ${Errors}
     StrCpy $UpdateMode 1
   ${EndIf}
+
+  ${GetOptions} $CMDLINE "/LANG=" $0
+  ${IfNot} ${Errors}
+    StrCpy $LANGUAGE $0
+  ${EndIf}
 FunctionEnd
 
 Section Uninstall
