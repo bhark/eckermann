@@ -20,6 +20,8 @@ updates:
     groups:
       bun:
         update-types: [minor, patch]
+        # own pr: every bump needs a diff of upstream's installer.nsi against our fork
+        exclude-patterns: ["@tauri-apps/cli"]
 
   - package-ecosystem: cargo
     directory: /src-tauri
