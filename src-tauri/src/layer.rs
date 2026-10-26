@@ -28,8 +28,20 @@ pub fn panel(window: &gtk::ApplicationWindow, width: i32, height: i32, margin: i
     }
     window.set_layer(Layer::Top);
     window.set_keyboard_mode(KeyboardMode::OnDemand);
+    fit(window, width, height, margin);
+}
+
+/// Resizes a `panel`; false when the window is not a layer surface.
+pub fn fit(window: &gtk::ApplicationWindow, width: i32, height: i32, margin: i32) -> bool {
+    if !window.is_layer_window() {
+        return false;
+    }
+    window.set_size_request(width, height);
+    // the size request alone never shrinks a window
+    window.resize(width, height);
     let inner = RectangleInt::new(margin, margin, width - 2 * margin, height - 2 * margin);
     window.input_shape_combine_region(Some(&Region::create_rectangle(&inner)));
+    true
 }
 
 fn init(window: &gtk::ApplicationWindow, namespace: &str, width: i32, height: i32) -> bool {

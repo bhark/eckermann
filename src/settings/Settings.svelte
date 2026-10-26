@@ -36,15 +36,36 @@
   let error = $state("");
   let version = $state("");
   let canvas: HTMLCanvasElement;
+  let main: HTMLElement;
+  let content: HTMLDivElement;
 
-  invoke<Settings>("get_settings").then((s) => (settings = s));
-  invoke<HotkeyStatus>("hotkey_status").then((s) => (status = s));
-  getVersion().then((v) => (version = v));
-  listen<Download>("download", (e) => (download = e.payload));
-  invoke<Download>("download_status").then((d) => (download = d));
-  invoke<boolean>("autostart").then((on) => (autostart = on));
   const refreshMics = () => invoke<Mic[]>("microphones").then((m) => (mics = m));
-  refreshMics();
+  const refreshPermissions = () => invoke<Permissions | null>("permissions").then((p) => (permissions = p));
+  listen<Download>("download", (e) => (download = e.payload));
+  const loaded = Promise.allSettled([
+    invoke<Settings>("get_settings").then((s) => (settings = s)),
+    invoke<HotkeyStatus>("hotkey_status").then((s) => (status = s)),
+    getVersion().then((v) => (version = v)),
+    invoke<Download>("download_status").then((d) => (download = d)),
+    invoke<boolean>("autostart").then((on) => (autostart = on)),
+    refreshMics(),
+    refreshPermissions(),
+  ]);
+
+  // the window takes the panel's height; the panel fills the window, so measure its content
+  function fit() {
+    const box = getComputedStyle(main);
+    const padding = parseFloat(box.paddingTop) + parseFloat(box.paddingBottom);
+    const border = main.offsetHeight - main.clientHeight;
+    const height = content.getBoundingClientRect().height + padding + border + 2 * main.offsetTop;
+    invoke("fit_settings", { height });
+  }
+  $effect(() => {
+    const observer = new ResizeObserver(fit);
+    // all loaded first, so the window resizes once on opening
+    loaded.then(() => observer.observe(content));
+    return () => observer.disconnect();
+  });
   const micOptions = $derived([
     { value: null, label: "Systemets standard" },
     ...mics.map((m) => ({ value: m.id, label: m.name })),
@@ -63,9 +84,7 @@
     { what: "microphone", name: "Mikrofon", why: "Så Eckermann kan høre dig." },
     { what: "accessibility", name: "Tilgængelighed", why: "Så genvejen virker, og teksten bliver skrevet ind." },
   ] as const;
-  const refreshPermissions = () => invoke<Permissions | null>("permissions").then((p) => (permissions = p));
   const missing = $derived(!!permissions && !(permissions.microphone && permissions.accessibility));
-  refreshPermissions();
   // granted in System Settings, so look again until both are there
   $effect(() => {
     if (!missing) return;
@@ -148,137 +167,139 @@
 
 <svelte:window {onkeydown} onfocus={refreshMics} />
 
-<main class="glass">
+<main class="glass" bind:this={main}>
   <button class="close" onclick={close} aria-label="Luk">
     <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
   </button>
 
-  <header>
-    <canvas class="ball" bind:this={canvas}></canvas>
-    <div>
-      <h1>Eckermann</h1>
-      <p class="dedication">Til Rune</p>
-      {#if version}<p>Version {version}</p>{/if}
-    </div>
-  </header>
+  <div class="content" bind:this={content}>
+    <header>
+      <canvas class="ball" bind:this={canvas}></canvas>
+      <div>
+        <h1>Eckermann</h1>
+        <p class="dedication">Til Rune</p>
+        {#if version}<p>Version {version}</p>{/if}
+      </div>
+    </header>
 
-  {#if download?.kind === "running"}
-    <div class="download">
-      Henter talemodellerne
-      <span class="hint">
-        {download.total ? `${mb(download.done)} af ${mb(download.total)} MB. ` : ""}Det sker kun første gang.
-      </span>
-      <progress value={download.done} max={download.total || 1}></progress>
-    </div>
-  {:else if download?.kind === "failed"}
-    <div class="row">
-      <span>
-        Talemodellerne kunne ikke hentes
-        <span class="hint">Tjek forbindelsen til internettet, og prøv igen.</span>
-      </span>
-      <button onclick={() => invoke("download_models")}>Prøv igen</button>
-    </div>
-  {/if}
-
-  {#if permissions}
-    {#each ASK as ask}
-      {#if !permissions[ask.what]}
-        <div class="row">
-          <span>
-            {ask.name}
-            <span class="hint">{ask.why}</span>
-          </span>
-          <button onclick={() => invoke("grant", { what: ask.what })}>Giv adgang</button>
-        </div>
-      {/if}
-    {/each}
-  {/if}
-
-  {#if settings}
-    <div class="row">
-      <span>
-        Genvej
+    {#if download?.kind === "running"}
+      <div class="download">
+        Henter talemodellerne
         <span class="hint">
-          {#if status?.kind === "manual"}
-            Giv denne kommando en genvej i dit skrivebords indstillinger.
-          {:else if capturing}
-            Bogstaver, tal og mellemrum kræver {mac ? "⌃, ⌥, ⇧ eller ⌘" : "Ctrl, Alt, Shift eller Super"}.
-          {:else}
-            Tryk én gang for at tale og igen for at stoppe.
-          {/if}
+          {download.total ? `${mb(download.done)} af ${mb(download.total)} MB. ` : ""}Det sker kun første gang.
         </span>
-      </span>
-      {#if status?.kind !== "manual"}
-        <span class="field">
-          {#if capturing}
-            <span class="listening">Tryk nu …</span>
-            <button onclick={() => (capturing = false)}>Fortryd</button>
-          {:else}
-            {#if hotkey}
-              {#each keyCaps(hotkey, mac) as key}<kbd>{key}</kbd>{/each}
-            {/if}
-            {#if mac && hotkey !== "Fn"}
-              <button onclick={() => setHotkey("Fn")}>Brug fn</button>
-            {/if}
-            <button onclick={capture}>{hotkey ? "Skift" : "Vælg"}</button>
-          {/if}
+        <progress value={download.done} max={download.total || 1}></progress>
+      </div>
+    {:else if download?.kind === "failed"}
+      <div class="row">
+        <span>
+          Talemodellerne kunne ikke hentes
+          <span class="hint">Tjek forbindelsen til internettet, og prøv igen.</span>
         </span>
-      {/if}
-    </div>
-    {#if status?.kind === "manual"}
-      <code>{status.command}</code>
-      {#if status.snippet}
-        <p class="hint">For eksempel med F2 i din konfiguration:</p>
-        <code>{status.snippet}</code>
-      {/if}
-    {:else if status?.kind === "niri" && !status.included}
-      <p class="hint">Tilføj denne linje sidst i din niri-konfiguration:</p>
-      <code>{status.include_line}</code>
-    {:else if mac && hotkey === "Fn"}
-      <p class="hint">Vælg under Tastatur i Systemindstillinger, at 🌐-tasten ikke skal gøre noget.</p>
+        <button onclick={() => invoke("download_models")}>Prøv igen</button>
+      </div>
     {/if}
 
-    <div class="row">
-      <span id="mic-label">Mikrofon</span>
-      <Picker options={micOptions} bind:value={settings.mic} labelledby="mic-label" onchange={save} />
-    </div>
+    {#if permissions}
+      {#each ASK as ask}
+        {#if !permissions[ask.what]}
+          <div class="row">
+            <span>
+              {ask.name}
+              <span class="hint">{ask.why}</span>
+            </span>
+            <button onclick={() => invoke("grant", { what: ask.what })}>Giv adgang</button>
+          </div>
+        {/if}
+      {/each}
+    {/if}
 
-    <label class="row">
-      <span>
-        Skriv efter en pause på
-        <span class="hint">0: først når du stopper</span>
-      </span>
-      <span class="field">
-        <input type="number" min="0" max="5000" step="100" bind:value={settings.pause_ms} onchange={save} />
-        <span class="unit">ms</span>
-      </span>
-    </label>
+    {#if settings}
+      <div class="row">
+        <span>
+          Genvej
+          <span class="hint">
+            {#if status?.kind === "manual"}
+              Giv denne kommando en genvej i dit skrivebords indstillinger.
+            {:else if capturing}
+              Bogstaver, tal og mellemrum kræver {mac ? "⌃, ⌥, ⇧ eller ⌘" : "Ctrl, Alt, Shift eller Super"}.
+            {:else}
+              Tryk én gang for at tale og igen for at stoppe.
+            {/if}
+          </span>
+        </span>
+        {#if status?.kind !== "manual"}
+          <span class="field">
+            {#if capturing}
+              <span class="listening">Tryk nu …</span>
+              <button onclick={() => (capturing = false)}>Fortryd</button>
+            {:else}
+              {#if hotkey}
+                {#each keyCaps(hotkey, mac) as key}<kbd>{key}</kbd>{/each}
+              {/if}
+              {#if mac && hotkey !== "Fn"}
+                <button onclick={() => setHotkey("Fn")}>Brug fn</button>
+              {/if}
+              <button onclick={capture}>{hotkey ? "Skift" : "Vælg"}</button>
+            {/if}
+          </span>
+        {/if}
+      </div>
+      {#if status?.kind === "manual"}
+        <code>{status.command}</code>
+        {#if status.snippet}
+          <p class="hint">For eksempel med F2 i din konfiguration:</p>
+          <code>{status.snippet}</code>
+        {/if}
+      {:else if status?.kind === "niri" && !status.included}
+        <p class="hint">Tilføj denne linje sidst i din niri-konfiguration:</p>
+        <code>{status.include_line}</code>
+      {:else if mac && hotkey === "Fn"}
+        <p class="hint">Vælg under Tastatur i Systemindstillinger, at 🌐-tasten ikke skal gøre noget.</p>
+      {/if}
 
-    <label class="row">
-      <span>Mellemrum efter hver diktering</span>
-      <input type="checkbox" class="switch" bind:checked={settings.trailing_space} onchange={save} />
-    </label>
+      <div class="row">
+        <span id="mic-label">Mikrofon</span>
+        <Picker options={micOptions} bind:value={settings.mic} labelledby="mic-label" onchange={save} />
+      </div>
 
-    {#if autostart !== null}
       <label class="row">
-        <span>Start Eckermann ved login</span>
-        <input type="checkbox" class="switch" bind:checked={autostart} onchange={saveAutostart} />
+        <span>
+          Skriv efter en pause på
+          <span class="hint">0: først når du stopper</span>
+        </span>
+        <span class="field">
+          <input type="number" min="0" max="5000" step="100" bind:value={settings.pause_ms} onchange={save} />
+          <span class="unit">ms</span>
+        </span>
+      </label>
+
+      <label class="row">
+        <span>Mellemrum efter hver diktering</span>
+        <input type="checkbox" class="switch" bind:checked={settings.trailing_space} onchange={save} />
+      </label>
+
+      {#if autostart !== null}
+        <label class="row">
+          <span>Start Eckermann ved login</span>
+          <input type="checkbox" class="switch" bind:checked={autostart} onchange={saveAutostart} />
+        </label>
+      {/if}
+
+      <label class="row">
+        <span>
+          Frigør hukommelsen efter
+          <span class="hint">Talemodellen indlæses igen, når du taler.</span>
+        </span>
+        <span class="field">
+          <input type="number" min="1" max="120" bind:value={settings.unload_after_min} onchange={save} />
+          <span class="unit">min</span>
+        </span>
       </label>
     {/if}
 
-    <label class="row">
-      <span>
-        Frigør hukommelsen efter
-        <span class="hint">Talemodellen indlæses igen, når du taler.</span>
-      </span>
-      <span class="field">
-        <input type="number" min="1" max="120" bind:value={settings.unload_after_min} onchange={save} />
-        <span class="unit">min</span>
-      </span>
-    </label>
-  {/if}
-
-  {#if error}<p class="error" role="alert">{error}</p>{/if}
+    {#if error}<p class="error" role="alert">{error}</p>{/if}
+  </div>
 </main>
 
 <style>
@@ -293,13 +314,18 @@
     inset: 28px;
     box-sizing: border-box;
     overflow-y: auto;
-    padding: 36px 36px 28px;
+    /* the last row's own 18px makes the bottom gap match the 36px sides */
+    padding: 36px 36px 18px;
     border-radius: 26px;
     border-color: rgb(255 255 255 / 0.09);
     background: rgb(26 26 27 / 0.97);
     color: var(--text);
     font-size: 16px;
     line-height: 1.4;
+  }
+  .content {
+    /* holds the children's margins, so its height is all the panel needs */
+    display: flow-root;
   }
   header {
     display: flex;
@@ -486,7 +512,7 @@
     outline-offset: 2px;
   }
   .error {
-    margin: 8px 0 0;
+    margin: 8px 0 18px;
     padding: 10px 14px;
     border-radius: 12px;
     background: rgb(122 54 30 / 0.5);

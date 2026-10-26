@@ -26,7 +26,10 @@ use std::time::Duration;
 use tauri::image::Image;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
-use tauri::{AppHandle, Emitter, Manager, RunEvent, State, WebviewUrl, WebviewWindowBuilder};
+use tauri::{
+    AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, RunEvent, State, WebviewUrl,
+    WebviewWindow, WebviewWindowBuilder,
+};
 use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_updater::UpdaterExt;
 
@@ -89,7 +92,8 @@ fn run() {
             set_autostart,
             permissions,
             grant,
-            microphones
+            microphones,
+            fit_settings
         ])
         .setup(|app| {
             let settings_path = app.path().app_config_dir()?.join("settings.json");
@@ -243,9 +247,9 @@ async fn install_update(app: &AppHandle) -> tauri_plugin_updater::Result<bool> {
     Ok(true)
 }
 
-// the panel plus the transparent margin around it, as in Settings.svelte
+// the panel plus the transparent margin around it, as in Settings.svelte; the page fits the height
 const SETTINGS_WIDTH: i32 = 496;
-const SETTINGS_HEIGHT: i32 = 760;
+const SETTINGS_HEIGHT: i32 = 700;
 #[cfg(target_os = "linux")]
 const SETTINGS_MARGIN: i32 = 28;
 
@@ -275,6 +279,38 @@ fn show_settings(app: &AppHandle) {
     }
     let _ = window.show();
     let _ = window.set_focus();
+}
+
+/// Fits the settings window to `height` logical pixels, margin included, within the screen.
+#[tauri::command]
+fn fit_settings(window: WebviewWindow, height: f64) -> tauri::Result<()> {
+    let area = window.current_monitor()?.map(|m| {
+        let (area, scale) = (m.work_area(), m.scale_factor());
+        (
+            area.position.to_logical::<f64>(scale),
+            area.size.to_logical::<f64>(scale),
+        )
+    });
+    let height = area
+        .map_or(height, |(_, size)| height.min(size.height))
+        .ceil() as i32;
+    #[cfg(target_os = "linux")]
+    if layer::fit(
+        &window.gtk_window()?,
+        SETTINGS_WIDTH,
+        height,
+        SETTINGS_MARGIN,
+    ) {
+        return Ok(());
+    }
+    window.set_size(LogicalSize::new(SETTINGS_WIDTH, height))?;
+    // by hand, as center() reads the size from before the resize on x11
+    if let Some((pos, size)) = area {
+        let x = pos.x + (size.width - f64::from(SETTINGS_WIDTH)) / 2.0;
+        let y = pos.y + (size.height - f64::from(height)) / 2.0;
+        window.set_position(LogicalPosition::new(x, y))?;
+    }
+    Ok(())
 }
 
 fn tray(app: &AppHandle) -> tauri::Result<()> {
