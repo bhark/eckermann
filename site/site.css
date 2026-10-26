@@ -1,0 +1,320 @@
+:root {
+  color-scheme: dark;
+  --ground: #141414;
+  --panel: #1a1a1b;
+  --text: #ecebe8;
+  --muted: #96938e;
+  --accent: #d9a650;
+  --rule: rgb(255 255 255 / 0.07);
+  --edge: rgb(255 255 255 / 0.09);
+  --rounded: ui-rounded, system-ui, sans-serif;
+}
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--text);
+  font: 16px/1.5 system-ui, sans-serif;
+}
+
+a {
+  color: var(--text);
+}
+a:hover {
+  color: #fff;
+}
+a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+main {
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding: 96px 16px 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 112px;
+}
+
+.hero {
+  max-width: 680px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+  text-align: center;
+}
+.logo {
+  position: relative;
+  width: 168px;
+  height: 168px;
+  display: grid;
+  place-items: center;
+}
+/* flow.ts draws the sphere at 86% of its canvas */
+.logo img {
+  width: 86%;
+}
+.logo canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+h1 {
+  font: 600 56px/1.05 var(--rounded);
+  letter-spacing: -0.015em;
+}
+.lead {
+  max-width: 560px;
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1.55;
+}
+
+.how {
+  width: 100%;
+  max-width: 860px;
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+}
+.window {
+  position: relative;
+  overflow: hidden;
+  border-radius: 22px;
+  border: 1px solid var(--edge);
+  background: var(--panel);
+  box-shadow:
+    inset 0 1px 0 rgb(255 245 225 / 0.06),
+    0 24px 60px rgb(0 0 0 / 0.45),
+    0 2px 6px rgb(0 0 0 / 0.25);
+}
+.titlebar {
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 1px solid var(--rule);
+  color: var(--muted);
+  font-size: 13px;
+}
+.letter {
+  box-sizing: border-box;
+  height: 420px;
+  padding: 40px clamp(24px, 6vw, 64px) 0;
+  font: 17px/1.75 "IBM Plex Mono", ui-monospace, monospace;
+}
+
+.steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 28px;
+}
+.steps li {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: opacity 300ms;
+}
+.steps .title {
+  font: 600 18px/1.3 var(--rounded);
+}
+.steps .muted {
+  font-size: 14px;
+}
+/* the demo sets data-step; without it every step stays lit */
+.steps[data-step] li {
+  opacity: 0.4;
+}
+.steps[data-step="1"] li:nth-child(1),
+.steps[data-step="2"] li:nth-child(2),
+.steps[data-step="3"] li:nth-child(3) {
+  opacity: 1;
+}
+kbd {
+  display: inline-block;
+  min-width: 1.6em;
+  padding: 1px 8px;
+  border-radius: 7px;
+  border: 1px solid rgb(255 255 255 / 0.16);
+  background: rgb(255 255 255 / 0.04);
+  font: 500 14px/1.6 system-ui, sans-serif;
+  text-align: center;
+  transition: all 150ms;
+}
+.steps[data-key] kbd {
+  border-color: var(--accent);
+  background: rgb(217 166 80 / 0.18);
+}
+
+.panel {
+  width: 100%;
+  max-width: 680px;
+  box-sizing: border-box;
+  padding: 28px 32px 10px;
+  border-radius: 26px;
+  border: 1px solid var(--edge);
+  background: var(--panel);
+  box-shadow:
+    inset 0 1px 0 rgb(255 245 225 / 0.06),
+    0 10px 30px rgb(0 0 0 / 0.35),
+    0 2px 6px rgb(0 0 0 / 0.25);
+}
+.panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 18px;
+}
+.panel-head h2 {
+  font: 600 22px/1.2 var(--rounded);
+}
+.panel-head .muted {
+  font-size: 14px;
+}
+.build {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px 0;
+  border-top: 1px solid var(--rule);
+}
+.build div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.build .muted {
+  font-size: 13px;
+}
+.get {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: 0 18px;
+  border-radius: 14px;
+  background: var(--accent);
+  color: var(--panel);
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.get:hover {
+  color: var(--panel);
+}
+.get svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.languages {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+}
+.flag {
+  display: block;
+  width: 40px;
+  height: 40px;
+  box-sizing: border-box;
+  overflow: hidden;
+  border-radius: 50%;
+  border: 1px solid rgb(255 255 255 / 0.12);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.3);
+}
+.flag svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.flag.more {
+  display: grid;
+  place-items: center;
+  border: 1px dashed rgb(255 255 255 / 0.28);
+  box-shadow: none;
+  color: var(--muted);
+}
+.flag.more svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.resources {
+  width: 100%;
+  max-width: 680px;
+  display: flex;
+  justify-content: space-evenly;
+  gap: 16px;
+}
+.resources div {
+  padding: 20px 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.resources .muted {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.resources svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.resources .value {
+  font: 600 20px/1.2 var(--rounded);
+}
+
+footer a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  color: var(--muted);
+}
+footer svg {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+}
