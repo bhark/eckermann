@@ -38,6 +38,7 @@ use tauri::{
     AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, RunEvent, State, WebviewUrl,
     WebviewWindow, WebviewWindowBuilder,
 };
+#[cfg(not(target_os = "macos"))]
 use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_updater::UpdaterExt;
 use ui::{Text, text};
@@ -101,6 +102,9 @@ fn run() {
                 Err(e) => log::warn!("second launch: {e}"),
             },
         ));
+    // macOS registers the app itself as a login item, see macos::set_autostart
+    #[cfg(not(target_os = "macos"))]
+    let builder = builder.plugin(tauri_plugin_autostart::Builder::new().build());
     let app = builder
         .plugin(
             tauri_plugin_log::Builder::default()
@@ -109,7 +113,6 @@ fn run() {
                 .level_for("whisper_rs::whisper_logging_hook", log::LevelFilter::Warn)
                 .build(),
         )
-        .plugin(tauri_plugin_autostart::Builder::new().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             get_settings,
@@ -154,7 +157,11 @@ fn run() {
                 download: Mutex::new(Download::Done),
             });
             if first_run {
-                if let Err(e) = app.autolaunch().enable() {
+                #[cfg(target_os = "macos")]
+                let enabled = macos::set_autostart(true);
+                #[cfg(not(target_os = "macos"))]
+                let enabled = app.autolaunch().enable().map_err(|e| e.to_string());
+                if let Err(e) = enabled {
                     log::error!("autostart: {e}");
                 }
                 #[cfg(target_os = "macos")]
@@ -414,11 +421,25 @@ fn download_models(app: AppHandle) {
     fetch_models(&app);
 }
 
+#[cfg(target_os = "macos")]
+#[tauri::command]
+fn autostart() -> bool {
+    macos::autostart()
+}
+
+#[cfg(target_os = "macos")]
+#[tauri::command]
+fn set_autostart(on: bool) -> Result<(), String> {
+    macos::set_autostart(on)
+}
+
+#[cfg(not(target_os = "macos"))]
 #[tauri::command]
 fn autostart(app: AppHandle) -> Result<bool, String> {
     app.autolaunch().is_enabled().map_err(|e| e.to_string())
 }
 
+#[cfg(not(target_os = "macos"))]
 #[tauri::command]
 fn set_autostart(app: AppHandle, on: bool) -> Result<(), String> {
     let launch = app.autolaunch();
