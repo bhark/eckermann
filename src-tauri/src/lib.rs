@@ -62,7 +62,11 @@ enum Download {
 
 /// Forwards a CLI command to the running instance, or starts the app if none runs.
 pub fn main() {
-    let args: Vec<String> = std::env::args().skip(1).collect();
+    let args: Vec<String> = std::env::args()
+        .skip(1)
+        // a process serial number launchservices may add on a first open
+        .filter(|a| !a.starts_with("-psn_"))
+        .collect();
     let cmd = ipc::from_args(&args).unwrap_or_else(|e| {
         eprintln!("{e}");
         std::process::exit(2)
@@ -169,14 +173,15 @@ fn run() {
         })
         .build(tauri::generate_context!())
         .expect("failed to build app");
-    app.run(|_, event| {
+    app.run(|_app, event| match event {
         // background app: closing the last window must not quit
-        if let RunEvent::ExitRequested {
+        RunEvent::ExitRequested {
             code: None, api, ..
-        } = event
-        {
-            api.prevent_exit();
-        }
+        } => api.prevent_exit(),
+        // opening the app again from Finder or Spotlight starts no second process on macOS
+        #[cfg(target_os = "macos")]
+        RunEvent::Reopen { .. } => show_settings(_app),
+        _ => {}
     });
 }
 
