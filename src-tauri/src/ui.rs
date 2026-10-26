@@ -14,6 +14,8 @@ pub enum Text {
     ModelsMissing,
     Settings,
     Quit,
+    #[cfg(target_os = "linux")]
+    Dictate,
 }
 
 /// The system's language, read once.
@@ -57,6 +59,8 @@ pub fn text(text: Text) -> &'static str {
         ),
         Text::Settings => ("Indstillinger", "Settings"),
         Text::Quit => ("Afslut", "Quit"),
+        #[cfg(target_os = "linux")]
+        Text::Dictate => ("Diktér", "Dictate"),
     };
     match language() {
         Language::Da => da,

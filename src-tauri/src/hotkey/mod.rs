@@ -1,5 +1,5 @@
-//! Global dictation key: a niri bind or an X11 key grab on Linux, an event tap on macOS.
-//! Other desktops get the command to bind in their own settings.
+//! Global dictation key: a niri bind, an X11 key grab or the GNOME/KDE portal on Linux, an event
+//! tap on macOS. Other desktops get the command to bind in their own settings.
 
 #[cfg(target_os = "macos")]
 mod mac;
@@ -20,6 +20,8 @@ pub enum Status {
     },
     #[cfg(target_os = "linux")]
     X11,
+    #[cfg(target_os = "linux")]
+    Portal,
     #[cfg(target_os = "linux")]
     Manual {
         command: String,
@@ -42,6 +44,9 @@ pub fn status() -> Status {
     if crate::x11::session() {
         return Status::X11;
     }
+    if crate::portal::session() {
+        return Status::Portal;
+    }
     let command = format!("{} --ptt toggle", sender().display());
     // F2 only as an example
     let snippet = if std::env::var_os("SWAYSOCK").is_some() {
@@ -60,6 +65,9 @@ pub fn start(combo: Option<&str>, on_press: impl Fn() + Send + 'static) {
     if crate::x11::session() {
         return crate::x11::listen(combo, on_press);
     }
+    if portal() {
+        return crate::portal::listen(combo, on_press);
+    }
     if let Some(Err(e)) = combo.map(niri::apply) {
         log::error!("hotkey: {e}");
     }
@@ -68,10 +76,18 @@ pub fn start(combo: Option<&str>, on_press: impl Fn() + Send + 'static) {
 /// Makes `combo` (niri key syntax, e.g. "Ctrl+Alt+Space") the dictation key.
 #[cfg(target_os = "linux")]
 pub fn apply(combo: &str) -> Result<(), String> {
-    match crate::x11::session() {
-        true => crate::x11::grab(combo),
+    if crate::x11::session() {
+        return crate::x11::grab(combo);
+    }
+    match portal() {
+        true => crate::portal::rebind(combo),
         false => niri::apply(combo),
     }
+}
+
+#[cfg(target_os = "linux")]
+fn portal() -> bool {
+    niri::status().is_none() && crate::portal::session()
 }
 
 /// The small sender beside us, else the app itself.

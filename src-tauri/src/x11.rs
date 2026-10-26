@@ -14,10 +14,10 @@ use x11rb::rust_connection::RustConnection;
 use x11rb::wrapper::ConnectionExt as _;
 
 // keysyms
-const CONTROL_L: u32 = 0xffe3;
-const V: u32 = 0x76;
-const RETURN: u32 = 0xff0d;
-const BACKSPACE: u32 = 0xff08;
+pub(crate) const CONTROL_L: u32 = 0xffe3;
+pub(crate) const V: u32 = 0x76;
+pub(crate) const RETURN: u32 = 0xff0d;
+pub(crate) const BACKSPACE: u32 = 0xff08;
 
 /// Whether this is an X11 session, where gtk and the clipboard talk to X as well.
 pub fn session() -> bool {

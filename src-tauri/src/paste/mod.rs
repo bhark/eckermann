@@ -8,19 +8,26 @@ mod wayland;
 #[cfg(target_os = "macos")]
 use macos::Keys;
 
-/// The Wayland virtual keyboard, or XTest in an X11 session.
+/// The Wayland virtual keyboard, else the GNOME/KDE portal; XTest in an X11 session.
 #[cfg(target_os = "linux")]
 enum Keys {
     Wayland(wayland::Keys),
     X11(Box<crate::x11::Keys>),
+    Portal(crate::portal::Keys),
 }
 
 #[cfg(target_os = "linux")]
 impl Keys {
     fn new() -> Result<Self, String> {
-        match crate::x11::session() {
-            true => crate::x11::Keys::new().map(|keys| Self::X11(Box::new(keys))),
-            false => wayland::Keys::new().map(Self::Wayland),
+        if crate::x11::session() {
+            return crate::x11::Keys::new().map(|keys| Self::X11(Box::new(keys)));
+        }
+        match wayland::Keys::new() {
+            Ok(keys) => Ok(Self::Wayland(keys)),
+            Err(e) if crate::portal::session() => crate::portal::Keys::new()
+                .map(Self::Portal)
+                .map_err(|portal| format!("{e}; {portal}")),
+            Err(e) => Err(e),
         }
     }
 
@@ -28,6 +35,7 @@ impl Keys {
         match self {
             Self::Wayland(keys) => keys.paste(),
             Self::X11(keys) => keys.paste(),
+            Self::Portal(keys) => keys.paste(),
         }
     }
 
@@ -35,6 +43,7 @@ impl Keys {
         match self {
             Self::Wayland(keys) => keys.enter(),
             Self::X11(keys) => keys.enter(),
+            Self::Portal(keys) => keys.enter(),
         }
     }
 
@@ -42,6 +51,7 @@ impl Keys {
         match self {
             Self::Wayland(keys) => keys.backspace(),
             Self::X11(keys) => keys.backspace(),
+            Self::Portal(keys) => keys.backspace(),
         }
     }
 }

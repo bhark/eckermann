@@ -21,6 +21,7 @@
     | { kind: "niri"; included: boolean; include_line: string }
     | { kind: "manual"; command: string; snippet: string | null }
     | { kind: "x11" }
+    | { kind: "portal" }
     | { kind: "mac" };
   type Permissions = { microphone: boolean; accessibility: boolean };
   type Download =

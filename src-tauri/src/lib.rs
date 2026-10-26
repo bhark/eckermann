@@ -12,6 +12,8 @@ pub mod models;
 mod overlay;
 mod paste;
 mod pipeline;
+#[cfg(target_os = "linux")]
+mod portal;
 pub mod punct;
 mod settings;
 pub mod stt;
