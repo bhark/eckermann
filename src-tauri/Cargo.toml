@@ -39,7 +39,7 @@ ashpd = { version = "0.13", default-features = false, features = ["tokio", "glob
 futures-channel = "0.3"
 futures-util = "0.3"
 libc = "0.2"
-x11rb = { version = "0.13", features = ["xkb", "xtest"] }
+x11rb = { version = "0.14", features = ["xkb", "xtest"] }
 whisper-rs = { version = "0.16", features = ["vulkan"] }
 wayland-client = "0.31"
 wayland-protocols-misc = { version = "0.3", features = ["client"] }
