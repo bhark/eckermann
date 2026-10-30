@@ -215,14 +215,18 @@ impl Keys {
         self.keys(&[(keysym, KeyState::Pressed), (keysym, KeyState::Released)])
     }
 
-    pub fn paste(&mut self) -> Result<(), String> {
-        use crate::x11::{CONTROL_L, V};
+    fn ctrl(&self, keysym: u32) -> Result<(), String> {
+        use crate::x11::CONTROL_L;
         self.keys(&[
             (CONTROL_L, KeyState::Pressed),
-            (V, KeyState::Pressed),
-            (V, KeyState::Released),
+            (keysym, KeyState::Pressed),
+            (keysym, KeyState::Released),
             (CONTROL_L, KeyState::Released),
         ])
+    }
+
+    pub fn paste(&mut self) -> Result<(), String> {
+        self.ctrl(crate::x11::V)
     }
 
     pub fn enter(&mut self) -> Result<(), String> {
@@ -234,13 +238,7 @@ impl Keys {
     }
 
     pub fn delete_word(&mut self) -> Result<(), String> {
-        use crate::x11::{BACKSPACE, CONTROL_L};
-        self.keys(&[
-            (CONTROL_L, KeyState::Pressed),
-            (BACKSPACE, KeyState::Pressed),
-            (BACKSPACE, KeyState::Released),
-            (CONTROL_L, KeyState::Released),
-        ])
+        self.ctrl(crate::x11::BACKSPACE)
     }
 }
 

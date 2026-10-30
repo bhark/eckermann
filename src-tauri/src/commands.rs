@@ -60,22 +60,17 @@ pub fn parse(phrase: &str, profile: &Profile) -> Vec<Item> {
     scan(&words, false, commands)
 }
 
-/// Whether a phrase still being spoken is plainly text, so its words can be typed before
-/// it ends: too long to be a misheard command, and not commands alone.
-pub fn is_text(phrase: &str, profile: &Profile) -> bool {
+/// Splits a phrase that is text, where an editing command is a word. Also returns whether
+/// a phrase still being spoken is plainly text, so its words can be typed before it ends:
+/// too long to be a misheard command, and not commands alone.
+pub fn parse_text(phrase: &str, profile: &Profile) -> (Vec<Item>, bool) {
     let text = plain(phrase, profile);
     let words: Vec<&str> = text.split_whitespace().collect();
-    words.len() > MISHEARD_WORDS
+    let plainly = words.len() > MISHEARD_WORDS
         && scan(&words, true, profile.commands)
             .iter()
-            .any(|item| matches!(item, Item::Word(_)))
-}
-
-/// Splits a phrase that is text, where an editing command is a word.
-pub fn parse_text(phrase: &str, profile: &Profile) -> Vec<Item> {
-    let text = plain(phrase, profile);
-    let words: Vec<&str> = text.split_whitespace().collect();
-    scan(&words, false, profile.commands)
+            .any(|item| matches!(item, Item::Word(_)));
+    (scan(&words, false, profile.commands), plainly)
 }
 
 fn scan(words: &[&str], editing: bool, commands: &'static [Command]) -> Vec<Item> {

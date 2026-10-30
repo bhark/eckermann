@@ -13,12 +13,7 @@ impl Keys {
     }
 
     pub fn paste(&mut self) -> Result<(), String> {
-        send(&[
-            (VK_CONTROL, true),
-            (VK_V, true),
-            (VK_V, false),
-            (VK_CONTROL, false),
-        ])
+        ctrl(VK_V)
     }
 
     pub fn enter(&mut self) -> Result<(), String> {
@@ -30,13 +25,17 @@ impl Keys {
     }
 
     pub fn delete_word(&mut self) -> Result<(), String> {
-        send(&[
-            (VK_CONTROL, true),
-            (VK_BACK, true),
-            (VK_BACK, false),
-            (VK_CONTROL, false),
-        ])
+        ctrl(VK_BACK)
     }
+}
+
+fn ctrl(key: VIRTUAL_KEY) -> Result<(), String> {
+    send(&[
+        (VK_CONTROL, true),
+        (key, true),
+        (key, false),
+        (VK_CONTROL, false),
+    ])
 }
 
 fn send(keys: &[(VIRTUAL_KEY, bool)]) -> Result<(), String> {
