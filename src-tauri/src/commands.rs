@@ -34,11 +34,14 @@ pub enum Action {
 /// A command's phrasings, in lowercase, and what it does.
 pub type Command = (&'static [&'static str], Action);
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Item {
     Word(String),
     Do(Action),
 }
+
+// a phrase this short, said alone, may be a misheard command
+const MISHEARD_WORDS: usize = 3;
 
 /// Splits a transcribed phrase into words and commands. Editing commands count only
 /// in a phrase of commands alone, so "hun kom slet ikke" stays text.
@@ -55,6 +58,24 @@ pub fn parse(phrase: &str, profile: &Profile) -> Vec<Item> {
         return vec![Item::Do(action)];
     }
     scan(&words, false, commands)
+}
+
+/// Whether a phrase still being spoken is plainly text, so its words can be typed before
+/// it ends: too long to be a misheard command, and not commands alone.
+pub fn is_text(phrase: &str, profile: &Profile) -> bool {
+    let text = plain(phrase, profile);
+    let words: Vec<&str> = text.split_whitespace().collect();
+    words.len() > MISHEARD_WORDS
+        && scan(&words, true, profile.commands)
+            .iter()
+            .any(|item| matches!(item, Item::Word(_)))
+}
+
+/// Splits a phrase that is text, where an editing command is a word.
+pub fn parse_text(phrase: &str, profile: &Profile) -> Vec<Item> {
+    let text = plain(phrase, profile);
+    let words: Vec<&str> = text.split_whitespace().collect();
+    scan(&words, false, profile.commands)
 }
 
 fn scan(words: &[&str], editing: bool, commands: &'static [Command]) -> Vec<Item> {
@@ -114,7 +135,7 @@ fn command_at(words: &[&str], commands: &'static [Command]) -> Option<(usize, Ac
 
 /// A short phrase said alone may be a misheard command, such as "nye linjer".
 fn misheard(words: &[&str], commands: &'static [Command]) -> Option<Action> {
-    if words.is_empty() || words.len() > 3 {
+    if words.is_empty() || words.len() > MISHEARD_WORDS {
         return None;
     }
     let heard: Vec<char> = words
@@ -136,13 +157,18 @@ fn misheard(words: &[&str], commands: &'static [Command]) -> Option<Action> {
         .map(|(_, action)| action)
 }
 
-fn core(word: &str) -> String {
+pub fn core(word: &str) -> String {
     word.trim_matches(|c: char| !c.is_alphanumeric())
         .to_lowercase()
 }
 
 /// Levenshtein distance between two sequences.
 pub fn distance<T: PartialEq>(a: &[T], b: &[T]) -> usize {
+    distances(a, b)[b.len()]
+}
+
+/// Levenshtein distance between `a` and each start of `b`, by its length.
+pub fn distances<T: PartialEq>(a: &[T], b: &[T]) -> Vec<usize> {
     let mut row: Vec<usize> = (0..=b.len()).collect();
     for (i, x) in a.iter().enumerate() {
         let mut prev = row[0];
@@ -153,7 +179,7 @@ pub fn distance<T: PartialEq>(a: &[T], b: &[T]) -> usize {
             prev = cur;
         }
     }
-    row[b.len()]
+    row
 }
 
 /// The phrase's words, edda's tags repaired first, with each split compound joined again.

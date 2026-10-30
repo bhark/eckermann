@@ -58,6 +58,14 @@ impl Keys {
             Self::Portal(keys) => keys.backspace(),
         }
     }
+
+    fn delete_word(&mut self) -> Result<(), String> {
+        match self {
+            Self::Wayland(keys) => keys.delete_word(),
+            Self::X11(keys) => keys.delete_word(),
+            Self::Portal(keys) => keys.delete_word(),
+        }
+    }
 }
 
 use crate::text::Edit;
@@ -95,12 +103,15 @@ impl Paster {
     /// Returns false when the text is only on the clipboard and the user must paste it.
     pub fn apply(&mut self, edit: &Edit) -> Result<bool, String> {
         self.find_keys();
-        if edit.delete > 0 {
+        if edit.delete > 0 || edit.delete_words > 0 {
             let Some(keys) = &mut self.keys else {
                 return Ok(false);
             };
             for _ in 0..edit.delete {
                 keys.backspace()?;
+            }
+            for _ in 0..edit.delete_words {
+                keys.delete_word()?;
             }
         }
         match edit.text.as_str() {

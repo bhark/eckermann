@@ -28,6 +28,15 @@ impl Keys {
     pub fn backspace(&mut self) -> Result<(), String> {
         send(&[(VK_BACK, true), (VK_BACK, false)])
     }
+
+    pub fn delete_word(&mut self) -> Result<(), String> {
+        send(&[
+            (VK_CONTROL, true),
+            (VK_BACK, true),
+            (VK_BACK, false),
+            (VK_CONTROL, false),
+        ])
+    }
 }
 
 fn send(keys: &[(VIRTUAL_KEY, bool)]) -> Result<(), String> {

@@ -179,6 +179,10 @@ impl Keys {
         self.tap(&[self.backspace])
     }
 
+    pub fn delete_word(&mut self) -> Result<(), String> {
+        self.tap(&[self.control, self.backspace])
+    }
+
     fn tap(&self, keys: &[Keycode]) -> Result<(), String> {
         let (conn, root) = (&self.display.conn, self.display.root);
         for &key in keys {

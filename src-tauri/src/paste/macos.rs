@@ -30,6 +30,10 @@ impl Keys {
     pub fn backspace(&mut self) -> Result<(), String> {
         tap(BACKSPACE, CGEventFlags::empty())
     }
+
+    pub fn delete_word(&mut self) -> Result<(), String> {
+        tap(BACKSPACE, CGEventFlags::MaskAlternate)
+    }
 }
 
 fn tap(key: CGKeyCode, flags: CGEventFlags) -> Result<(), String> {
