@@ -6,10 +6,12 @@ on:
     paths:
       - site/**
       - src/flow.ts
-      - src-tauri/tauri.conf.json
       - package.json
       - bun.lock
       - .github/workflows/site.yml
+  # runs on the tag, so the github-pages environment needs a v* tag rule
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
@@ -33,6 +35,12 @@ jobs:
           bun-version: 1.4.4
       - run: bun install --frozen-lockfile
       - run: bun run check
+      # the latest published release, which the download links serve
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag=$(gh release view -R "$GITHUB_REPOSITORY" --json tagName -q .tagName)
+          echo "VITE_VERSION=${tag#v}" >> "$GITHUB_ENV"
       - run: bun run site:build
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:

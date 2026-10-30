@@ -1,7 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Eckermann",
-  "version": "0.2.0",
   "identifier": "dk.forn.eckermann",
   "build": {
     "frontendDist": "../dist",

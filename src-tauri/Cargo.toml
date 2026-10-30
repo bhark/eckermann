@@ -1,6 +1,7 @@
 [package]
 name = "eckermann"
-version = "0.2.0"
+# placeholder; ci stamps the release tag's version
+version = "0.0.0"
 description = "Local dictation into any app"
 license = "GPL-3.0-only"
 edition = "2024"
