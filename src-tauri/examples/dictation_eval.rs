@@ -4,6 +4,7 @@
 //! LANGUAGE is da or en; PUNCT_DIR none keeps whisper's own marks.
 //! A case is `reference \t audio`: `|` separates phrases, `+` joins clips into one phrase
 //! with a pause between them. Paths are relative to CASES.tsv, `\n` in a reference is a line break.
+//! STREAM=ms also previews each phrase every ms of its audio, typing what previews agree on.
 
 #[path = "common/wav.rs"]
 mod wav;
@@ -136,6 +137,12 @@ fn main() -> Result<(), String> {
     let (mut cases, mut exact, mut lost) = (0, 0, 0);
     let (mut word_errors, mut ref_words, mut mark_errors, mut ref_marks) = (0, 0, 0, 0);
     let (mut phrases, mut seconds) = (0, 0.0);
+    let stream = match std::env::var("STREAM") {
+        Ok(ms) => Some(ms.parse::<usize>().map_err(|e| format!("STREAM: {e}"))? * 16),
+        Err(_) => None,
+    };
+    let (mut previews, mut preview_seconds, mut early, mut typed_chars) = (0, 0.0, 0, 0);
+    let mut corrected = 0;
     // true positives, false positives, misses: commas, sentence ends, capitals
     let mut punct = [[0usize; 3]; 3];
     for row in rows.lines().filter(|l| !l.is_empty()).take(n) {
@@ -153,11 +160,7 @@ fn main() -> Result<(), String> {
                 }
                 pcm.extend(wav::read_16k_mono(&dir.join(clip).to_string_lossy())?);
             }
-            let t = Instant::now();
-            let text = stt.transcribe(&pcm, joiner.prompt())?;
-            seconds += t.elapsed().as_secs_f32();
-            phrases += 1;
-            let label = |words: &[String]| {
+            let mut label = |words: &[String]| {
                 let Some(punctuator) = &punctuator else {
                     return Vec::new();
                 };
@@ -169,11 +172,28 @@ fn main() -> Result<(), String> {
                 punct_runs += 1;
                 labels
             };
-            joiner
-                .next(&text, i + 1 == parts.len(), true, label)
-                .apply(&mut doc);
+            for end in stream
+                .into_iter()
+                .flat_map(|step| (step..pcm.len()).step_by(step))
+            {
+                let t = Instant::now();
+                let text = stt.transcribe(&pcm[..end], joiner.prompt())?;
+                preview_seconds += t.elapsed().as_secs_f32();
+                previews += 1;
+                let (edit, _) = joiner.heard(&text, &mut label);
+                early += edit.text.chars().count();
+                edit.apply(&mut doc);
+            }
+            let t = Instant::now();
+            let text = stt.transcribe(&pcm, joiner.prompt())?;
+            seconds += t.elapsed().as_secs_f32();
+            phrases += 1;
+            let edit = joiner.next(&text, i + 1 == parts.len(), true, &mut label);
+            corrected += edit.delete;
+            edit.apply(&mut doc);
             heard.push(text);
         }
+        typed_chars += doc.chars().count();
         let typed = doc.trim_end();
         let (want, got) = (words(&reference), words(typed));
         let word_err = distance(&want, &got);
@@ -229,6 +249,14 @@ fn main() -> Result<(), String> {
             "{name}: precision {:.0}%, recall {:.0}% ({tp} right, {fp} extra, {miss} missed)",
             pct(tp, fp),
             pct(tp, miss)
+        );
+    }
+    if stream.is_some() {
+        println!(
+            "previews: {:.2}s each, {:.0}% of the text typed before its pause, {:.0}% of that deleted again",
+            preview_seconds / previews.max(1) as f32,
+            100.0 * early as f32 / typed_chars.max(1) as f32,
+            100.0 * corrected as f32 / early.max(1) as f32
         );
     }
     println!(

@@ -1,4 +1,4 @@
-//! Ctrl+V, Enter and Backspace through the Wayland virtual keyboard protocol (wlroots compositors, niri, Hyprland).
+//! Ctrl+V, Enter, Backspace and Ctrl+Backspace through the Wayland virtual keyboard protocol (wlroots compositors, niri, Hyprland).
 
 use std::io::Write;
 use std::os::fd::AsFd;
@@ -72,6 +72,10 @@ impl Keys {
 
     pub fn backspace(&mut self) -> Result<(), String> {
         self.tap(KEY_BACKSPACE, 0)
+    }
+
+    pub fn delete_word(&mut self) -> Result<(), String> {
+        self.tap(KEY_BACKSPACE, CONTROL_MASK)
     }
 
     fn tap(&mut self, key: u32, modifiers: u32) -> Result<(), String> {

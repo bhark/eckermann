@@ -12,22 +12,32 @@ const KEEP_TYPED: usize = 4096;
 // words before a phrase that the punctuation model sees
 const CONTEXT_WORDS: usize = 48;
 
-/// Delete `delete` characters before the cursor, then type `text`.
-#[derive(Debug, PartialEq)]
+/// Delete `delete` characters before the cursor, then `delete_words` words with the app's
+/// own word-delete key, then type `text`.
+#[derive(Debug, Default, PartialEq)]
 pub struct Edit {
     pub delete: usize,
+    /// words from before this dictation, which only the app knows
+    pub delete_words: usize,
     pub text: String,
 }
 
 impl Edit {
     pub fn is_empty(&self) -> bool {
-        self.delete == 0 && self.text.is_empty()
+        self.delete == 0 && self.delete_words == 0 && self.text.is_empty()
     }
 
     /// What the edit does to `doc`, the text before the cursor.
     pub fn apply(&self, doc: &mut String) {
         for _ in 0..self.delete {
             doc.pop();
+        }
+        for _ in 0..self.delete_words {
+            // ponytail: apps differ on the marks and spaces around a word; this takes them all
+            let rest = doc
+                .trim_end()
+                .trim_end_matches(|c: char| !c.is_whitespace());
+            doc.truncate(rest.len());
         }
         doc.push_str(&self.text);
     }
@@ -42,6 +52,8 @@ enum Tail {
     /// a word whose natural mark is typed only once the next word comes: a spoken mark
     /// replaces it, and at a phrase's end the next phrase gives the model its right context
     Held(Option<char>),
+    /// a word whose held mark a long pause typed; the page may have changed after it
+    Settled,
     Spoken(Fit),
 }
 
@@ -56,6 +68,12 @@ pub struct Joiner {
     // during a phrase: typed is unchanged before low, and this many characters went from there
     low: usize,
     deleted: usize,
+    deleted_words: usize,
+    // the phrase being spoken: its items typed already, and its last preview
+    spoken: Vec<Item>,
+    previewed: Vec<Item>,
+    // before the phrase's first early word; its pause types the whole phrase from here again
+    before_phrase: Option<Box<Joiner>>,
 }
 
 impl Joiner {
@@ -67,6 +85,10 @@ impl Joiner {
             typed: String::new(),
             low: 0,
             deleted: 0,
+            deleted_words: 0,
+            spoken: Vec::new(),
+            previewed: Vec::new(),
+            before_phrase: None,
         }
     }
 
@@ -74,7 +96,8 @@ impl Joiner {
         &self.context
     }
 
-    /// The edit for the next `phrase` of the dictation; `last` ends the dictation.
+    /// The edit for the next `phrase` of the dictation; `last` ends the dictation. Words
+    /// `heard` typed early are corrected where the whole phrase heard them differently.
     /// `punct` labels words, the ones typed before first; no labels keeps whisper's marks.
     pub fn next(
         &mut self,
@@ -83,16 +106,111 @@ impl Joiner {
         trailing_space: bool,
         punct: impl FnOnce(&[String]) -> Vec<Label>,
     ) -> Edit {
+        let shown = self
+            .before_phrase
+            .take()
+            .map(|before| std::mem::replace(self, *before).typed);
+        self.spoken.clear();
+        self.previewed.clear();
+        let said = phrase.trim_end_matches(ENDS);
+        if !said.is_empty() {
+            self.context = said.to_string();
+        }
+        let items = commands::parse(phrase, self.profile);
+        let mut edit = self.type_items(&items, &[], last, trailing_space, punct);
+        if let Some(shown) = shown {
+            // a word deleted from before the dictation goes after all the phrase typed
+            let same = match edit.delete_words {
+                0 => shown
+                    .chars()
+                    .zip(self.typed.chars())
+                    .take_while(|(a, b)| a == b)
+                    .map(|(c, _)| c.len_utf8())
+                    .sum(),
+                _ => 0,
+            };
+            edit.delete = shown[same..].chars().count();
+            edit.text = self.typed[same..].to_string();
+        }
+        // only between phrases, so early words and their phrase line up in typed
+        if self.typed.len() > 2 * KEEP_TYPED {
+            let from = self.typed.ceil_char_boundary(self.typed.len() - KEEP_TYPED);
+            self.typed.drain(..from);
+        }
+        edit
+    }
+
+    /// Types the held mark, once the pause is long enough that the user may edit next.
+    pub fn settle(&mut self) -> Edit {
+        self.low = self.typed.len();
+        if let Tail::Held(mark) = self.tail {
+            self.typed.extend(mark);
+            self.tail = Tail::Settled;
+        }
+        Edit {
+            text: self.typed[self.low..].to_string(),
+            ..Edit::default()
+        }
+    }
+
+    /// Types the start of the phrase being spoken once two previews in a row agree on it.
+    /// Returns that edit, and what the rest of `phrase` would type now.
+    pub fn heard(
+        &mut self,
+        phrase: &str,
+        mut punct: impl FnMut(&[String]) -> Vec<Label>,
+    ) -> (Edit, String) {
+        if self.spoken.is_empty() && !commands::is_text(phrase, self.profile) {
+            return (Edit::default(), self.preview(phrase, punct));
+        }
+        let items = commands::parse_text(phrase, self.profile);
+        let from = typed_until(&self.spoken, &items);
+        let before = &self.previewed[typed_until(&self.spoken, &self.previewed)..];
+        let agreed = items[from..]
+            .iter()
+            .zip(before)
+            .take_while(|(a, b)| key(a) == key(b))
+            .count();
+        // the last may still grow into a command; holding two cut own recordings' WER from 4.8% to 3.8%
+        let sure = &items[from..from + agreed.saturating_sub(2)];
+        let rest = &items[from + sure.len()..];
+        if !sure.is_empty() && self.before_phrase.is_none() {
+            self.before_phrase = Some(Box::new(self.clone()));
+        }
+        let edit = self.type_items(sure, rest, false, false, &mut punct);
+        self.spoken.extend_from_slice(sure);
+        let preview = self.clone().type_items(rest, &[], false, false, punct).text;
+        self.previewed = items;
+        (edit, preview.trim_start_matches(' ').to_string())
+    }
+
+    /// `ahead`: items still to come, which the model sees but are not typed.
+    fn type_items(
+        &mut self,
+        items: &[Item],
+        ahead: &[Item],
+        last: bool,
+        trailing_space: bool,
+        punct: impl FnOnce(&[String]) -> Vec<Label>,
+    ) -> Edit {
         self.low = self.typed.len();
         self.deleted = 0;
-        let items = commands::parse(phrase, self.profile);
+        self.deleted_words = 0;
+        let bare_words = |items: &[Item]| -> Vec<String> {
+            items
+                .iter()
+                .filter_map(|item| match item {
+                    Item::Word(word) if !bare(word).0.is_empty() => Some(bare(word).0.to_string()),
+                    _ => None,
+                })
+                .collect()
+        };
         let mut words = self.recent_words();
         let before = words.len();
-        words.extend(items.iter().filter_map(|item| match item {
-            Item::Word(word) if !bare(word).0.is_empty() => Some(bare(word).0.to_string()),
-            _ => None,
-        }));
-        let labels = match words.len() > before {
+        words.extend(bare_words(items));
+        let typing = words.len() > before;
+        words.extend(bare_words(ahead));
+        let labels = match typing {
             true => punct(&words),
             false => Vec::new(),
         };
@@ -119,10 +237,6 @@ impl Joiner {
                 Item::Do(Action::Delete) => self.delete(),
             }
         }
-        let said = phrase.trim_end_matches(ENDS);
-        if !said.is_empty() {
-            self.context = said.to_string();
-        }
         if last {
             if let Tail::Held(Some(mark)) = self.tail {
                 self.typed.push(mark);
@@ -137,15 +251,11 @@ impl Joiner {
             self.tail = Tail::Start;
             self.context.clear();
         }
-        let edit = Edit {
+        Edit {
             delete: self.deleted,
+            delete_words: self.deleted_words,
             text: self.typed[self.low..].to_string(),
-        };
-        if self.typed.len() > 2 * KEEP_TYPED {
-            let from = self.typed.ceil_char_boundary(self.typed.len() - KEEP_TYPED);
-            self.typed.drain(..from);
         }
-        edit
     }
 
     /// The last words typed, without their marks.
@@ -201,7 +311,7 @@ impl Joiner {
         let whisper = |c: char| MARKS.contains(&c) || (fit == Fit::Join && c == '-');
         let bare = self.typed[..spaced].trim_end_matches(whisper).len();
         match (&self.tail, fit) {
-            (Tail::Spoken(..), _) => self.cut(spaced),
+            (Tail::Spoken(..) | Tail::Settled, _) => self.cut(spaced),
             // a line break keeps the sentence end whisper wrote, not its commas
             (_, Fit::Line) => {
                 let end = self.typed[..spaced].trim_end_matches([',', ':', ';']).len();
@@ -228,6 +338,12 @@ impl Joiner {
     /// Removes the previous word with the marks after it, or a line break.
     fn delete(&mut self) {
         let typed = self.typed.trim_end_matches(' ');
+        if typed.is_empty() {
+            self.cut(0);
+            self.deleted_words += 1;
+            self.tail = Tail::Start;
+            return;
+        }
         let rest = match typed.trim_end_matches('\n') {
             fewer if fewer.len() < typed.len() => fewer,
             // to the space before, so "e-mail" or "14.30" goes whole
@@ -265,6 +381,24 @@ impl Joiner {
             n => "⌫".repeat(n),
         }
     }
+}
+
+/// The item without whisper's case and marks, to compare two readings of a phrase.
+fn key(item: &Item) -> Item {
+    match item {
+        Item::Word(word) => Item::Word(commands::core(word)),
+        Item::Do(action) => Item::Do(*action),
+    }
+}
+
+/// Where the typed `spoken` items end in `items`, a new reading of their phrase.
+fn typed_until(spoken: &[Item], items: &[Item]) -> usize {
+    let keys = |items: &[Item]| items.iter().map(key).collect::<Vec<_>>();
+    let row = commands::distances(&keys(spoken), &keys(items));
+    // on a tie the furthest, as the final reading mostly adds marks the previews lacked
+    (0..row.len())
+        .min_by_key(|&j| (row[j], std::cmp::Reverse(j)))
+        .unwrap_or(0)
 }
 
 /// The word without whisper's marks after it, and those marks.
@@ -454,6 +588,21 @@ mod tests {
     }
 
     #[test]
+    fn settles_the_held_mark_for_good() {
+        let m = model(&[("tur", ',')], Some('.'), &[]);
+        let mut j = joiner();
+        let mut next = |phrase: &str| j.next(phrase, false, true, &m).text;
+        assert_eq!(next("Jeg gik en tur."), "Jeg gik en tur");
+        assert_eq!(j.settle().text, ",");
+        assert_eq!(j.settle().text, "");
+        // a spoken line break no longer takes the comma back
+        assert_eq!(
+            j.next("ny linje i skoven", false, true, &m).text,
+            "\nI skoven"
+        );
+    }
+
+    #[test]
     fn keeps_whisper_marks_without_a_model() {
         let none = |_: &[String]| Vec::new();
         let mut j = joiner();
@@ -630,23 +779,23 @@ mod tests {
     }
 
     #[test]
-    fn deletes_into_the_dictation_before() {
+    fn deletes_text_from_before_the_dictation_by_word() {
         let m = model(&[], Some('.'), NAMES);
         let mut j = joiner();
-        let mut doc = String::new();
-        dictate(&mut j, &mut doc, &["Jeg har en hund.", ""], &m);
-        assert_eq!(doc, "Jeg har en hund. ");
+        let mut doc = String::from("Jeg har en hund. ");
         let slet = j.next("slet", false, true, &m);
         assert_eq!(
             slet,
             Edit {
-                delete: 7,
+                delete: 0,
+                delete_words: 1,
                 text: String::new()
             }
         );
         slet.apply(&mut doc);
         dictate(&mut j, &mut doc, &["kat.", ""], &m);
-        assert_eq!(doc, "Jeg har en kat. ");
+        // what comes before the cursor is unknown, so the word starts a sentence
+        assert_eq!(doc, "Jeg har en Kat. ");
     }
 
     #[test]
@@ -663,5 +812,81 @@ mod tests {
             j.next("Så smilede hun", true, false, &m).text,
             ", så smilede hun."
         );
+    }
+
+    /// As `typed_with`, but each phrase also comes word by word first, as previews do.
+    fn streamed(phrases: &[&str], punct: &impl Fn(&[String]) -> Vec<Label>) -> String {
+        let mut j = joiner();
+        let mut doc = String::new();
+        for (i, phrase) in phrases.iter().enumerate() {
+            let words: Vec<&str> = phrase.split_whitespace().collect();
+            for n in 1..words.len() {
+                // edda ends each clip like a sentence
+                let (edit, _) = j.heard(&format!("{}.", words[..n].join(" ")), punct);
+                edit.apply(&mut doc);
+            }
+            j.next(phrase, i + 1 == phrases.len(), true, punct)
+                .apply(&mut doc);
+        }
+        doc
+    }
+
+    #[test]
+    fn types_agreed_words_as_the_whole_phrase_would() {
+        let m = model(&[("tur", ','), ("skoven", '.')], Some('.'), NAMES);
+        let cases: [&[&str]; 5] = [
+            &["Jeg gik en tur i skoven og så en hjort", ""],
+            &["Vi skriver her ny linje og så videre", ""],
+            &["Hun kom slet ikke til festen i går", ""],
+            &["Jeg gik hjem komma og så sov jeg punktum", ""],
+            &[
+                "Jeg gik en tur i skoven.",
+                "Og så kom Anne hjem igen",
+                "slet",
+                "",
+            ],
+        ];
+        for phrases in cases {
+            assert_eq!(
+                streamed(phrases, &m),
+                typed_with(phrases, &m),
+                "{phrases:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn waits_for_a_command_to_be_whole() {
+        let m = model(&[], Some('.'), NAMES);
+        let mut j = joiner();
+        assert_eq!(j.heard("vi skriver her ny", &m).0, Edit::default());
+        let (edit, rest) = j.heard("vi skriver her ny linje", &m);
+        assert_eq!(edit.text, "Vi");
+        assert_eq!(rest, "skriver her\n");
+        // alone, it may be a command until the pause
+        let mut j = joiner();
+        j.heard("slet slet", &m);
+        assert_eq!(j.heard("slet slet", &m), (Edit::default(), "⌫⌫".into()));
+    }
+
+    #[test]
+    fn corrects_early_words_the_whole_phrase_heard_differently() {
+        let m = model(&[], Some('.'), NAMES);
+        let mut j = joiner();
+        let mut doc = String::new();
+        j.heard("Jeg gik en tur.", &m).0.apply(&mut doc);
+        j.heard("Jeg gik en tur i.", &m).0.apply(&mut doc);
+        j.heard("Jeg gik en tur i skoven.", &m).0.apply(&mut doc);
+        assert_eq!(doc, "Jeg gik en");
+        let edit = j.next("Jeg gik den tur i skoven.", true, true, &m);
+        assert_eq!(edit.delete, 2);
+        edit.apply(&mut doc);
+        assert_eq!(doc, "Jeg gik den tur i skoven. ");
+        // edda's spoken marks come in late, but the words typed stay typed once
+        let da = Language::Da.profile();
+        let typed = commands::parse_text("Du skal købe følgende mælk brød", da);
+        let fin =
+            commands::parse_text("Du skal købe følgende,’Kolon mælk,’Komma brød og smør.", da);
+        assert_eq!(typed_until(&typed, &fin), 8);
     }
 }

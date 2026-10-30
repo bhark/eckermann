@@ -232,6 +232,16 @@ impl Keys {
     pub fn backspace(&mut self) -> Result<(), String> {
         self.tap(crate::x11::BACKSPACE)
     }
+
+    pub fn delete_word(&mut self) -> Result<(), String> {
+        use crate::x11::{BACKSPACE, CONTROL_L};
+        self.keys(&[
+            (CONTROL_L, KeyState::Pressed),
+            (BACKSPACE, KeyState::Pressed),
+            (BACKSPACE, KeyState::Released),
+            (CONTROL_L, KeyState::Released),
+        ])
+    }
 }
 
 #[cfg(test)]
